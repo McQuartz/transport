@@ -10,13 +10,14 @@ using juce::Point;
 class HeaderView::IconButton final : public juce::Component, public juce::SettableTooltipClient, public Animated
 {
 public:
-    enum class Kind { prev, play, next, repeat };
+    enum class Kind { prev, play, next, repeat, shuffle };
 
     explicit IconButton (Kind k) : kind (k) { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
 
     std::function<void()> onClick;
     void setPlaying (bool p) { morph.target = p ? 1.0f : 0.0f; }
     void setRepeat (int m)   { repeatMode = m; morph.target = m > 0 ? 1.0f : 0.0f; repaint(); }
+    void setToggled (bool on) { morph.target = on ? 1.0f : 0.0f; repaint(); }
 
     void animate (float dt) override
     {
@@ -44,6 +45,22 @@ public:
         const auto c = b.getCentre();
         g.addTransform (juce::AffineTransform::translation (-boxW * 0.5f, -boxH * 0.5f).scaled (scale).translated (c.x, c.y));
 
+        if (kind == Kind::shuffle)
+        {
+            // two crossing arrows; accent when on
+            const auto base = theme::icon.interpolatedWith (theme::iconBright, state.hover.current * 0.75f);
+            g.setColour (base.interpolatedWith (theme::accent, morph.current));
+            juce::Path lines;
+            lines.startNewSubPath (4, 9);  lines.cubicTo (14, 9, 18, 25, 25, 25);
+            lines.startNewSubPath (4, 25); lines.cubicTo (10, 25, 12, 20, 14, 17.5f);
+            lines.startNewSubPath (19, 12); lines.cubicTo (21, 10, 22, 9, 25, 9);
+            g.strokePath (lines, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            juce::Path heads;
+            heads.addTriangle (24, 3.5f, 31, 9, 24, 14.5f);
+            heads.addTriangle (24, 19.5f, 31, 25, 24, 30.5f);
+            g.fillPath (heads);
+            return;
+        }
         if (kind == Kind::repeat)
         {
             // two arrows chasing each other round a loop; accent when on, a "1" inside for repeat one
@@ -137,7 +154,14 @@ public:
         spk.lineTo (12, cy + 8); spk.lineTo (6, cy + 3.5f); spk.lineTo (2, cy + 3.5f); spk.closeSubPath();
         g.setColour (theme::icon.interpolatedWith (theme::iconBright, hover.current * 0.5f));
         g.fillPath (spk);
-        for (int i = 0; i < 2; ++i)
+        if (value <= 0.0f)
+        {
+            // muted: a cross where the waves were
+            g.setColour (theme::icon.interpolatedWith (theme::iconBright, hover.current * 0.5f));
+            g.drawLine (15.5f, cy - 4.0f, 23.5f, cy + 4.0f, 1.6f);
+            g.drawLine (23.5f, cy - 4.0f, 15.5f, cy + 4.0f, 1.6f);
+        }
+        else for (int i = 0; i < 2; ++i)
         {
             const float a = juce::jlimit (0.0f, 1.0f, shown.current * 2.5f - (float) i * 0.9f);
             if (a <= 0.0f) continue;
@@ -264,6 +288,10 @@ HeaderView::HeaderView()
     repeatButton->onClick = [this] { if (onRepeat) onRepeat(); };
     repeatButton->setTitle ("Repeat");
     setRepeat (0);
+    shuffleButton = std::make_unique<IconButton> (IconButton::Kind::shuffle);
+    shuffleButton->onClick = [this] { if (onShuffle) onShuffle(); };
+    shuffleButton->setTitle ("Shuffle");
+    setShuffle (false);
     prevButton->onClick = [this] { if (onPrev) onPrev(); };
     playButton->onClick = [this] { if (onPlayPause) onPlayPause(); };
     nextButton->onClick = [this] { if (onNext) onNext(); };
@@ -274,7 +302,7 @@ HeaderView::HeaderView()
     volume = std::make_unique<VolumeSlider>();
     volume->onChange = [this] (float v) { if (onVolumeChanged) onVolumeChanged (v); };
 
-    for (auto* c : std::initializer_list<juce::Component*> { prevButton.get(), playButton.get(), nextButton.get(), repeatButton.get(), volume.get() })
+    for (auto* c : std::initializer_list<juce::Component*> { prevButton.get(), playButton.get(), nextButton.get(), repeatButton.get(), shuffleButton.get(), volume.get() })
         addAndMakeVisible (c);
 
     artFade.snap (1.0f);
@@ -330,6 +358,12 @@ void HeaderView::setRepeat (int mode)
     repeatButton->setTooltip (mode == 0 ? "Repeat: off" : (mode == 1 ? "Repeat: all tracks in the folder" : "Repeat: this track"));
 }
 
+void HeaderView::setShuffle (bool on)
+{
+    shuffleButton->setToggled (on);
+    shuffleButton->setTooltip (on ? "Shuffle: on" : "Shuffle: off");
+}
+
 void HeaderView::setVolume (float v) { volume->setValue (v, false); }
 
 void HeaderView::setTimeLine (const juce::String& line)
@@ -364,7 +398,7 @@ void HeaderView::setQuickActive (QuickAction a, bool active)
 
 void HeaderView::animate (float dt)
 {
-    for (auto* a : std::initializer_list<Animated*> { prevButton.get(), playButton.get(), nextButton.get(), repeatButton.get(), volume.get() })
+    for (auto* a : std::initializer_list<Animated*> { prevButton.get(), playButton.get(), nextButton.get(), repeatButton.get(), shuffleButton.get(), volume.get() })
         a->animate (dt);
     for (auto& q : quick)
         q->animate (dt);
@@ -454,8 +488,10 @@ void HeaderView::paint (juce::Graphics& g)
         }
         else
         {
-            juce::String one = lines.joinIntoString (utf8 ("  \xc2\xb7  "));
-            if (withTime && timeLine.isNotEmpty()) one << utf8 ("  \xc2\xb7  ") << timeLine;
+            // the time comes first: when the line gets cut, the file details go, not the clock
+            juce::String one;
+            if (withTime && timeLine.isNotEmpty()) one << timeLine << utf8 ("  \xc2\xb7  ");
+            one << lines.joinIntoString (utf8 ("  \xc2\xb7  "));
             all.add (one);
         }
         float y = r.getBottom() - 15.0f * (float) all.size();
@@ -508,17 +544,18 @@ void HeaderView::resized()
 
     // play sits in the middle of the window (under the title) whenever that leaves room for the text
     // on the left and the volume icon on the right; otherwise it moves just as far as needed
-    const int leftLimit = textX + minText + gapL;
+    const int leftLimit = textX + minText + gapL + wing;           // shuffle sits left of prev
     const int rightLimit = qx - gapL - volIcon - gapL - wing;      // right edge of the core
     int coreX = (w - core) / 2;
     coreX = juce::jmin (coreX, rightLimit - core);
     coreX = juce::jmax (coreX, juce::jmin (leftLimit, rightLimit - core));
-    coreX = juce::jmax (coreX, textX);
+    coreX = juce::jmax (coreX, textX + wing);
 
     prevButton->setBounds (coreX, (h - sideSize) / 2, sideSize, sideSize);
     playButton->setBounds (prevButton->getRight() + gapL, (h - playSize) / 2, playSize, playSize);
     nextButton->setBounds (playButton->getRight() + gapL, (h - sideSize) / 2, sideSize, sideSize);
     repeatButton->setBounds (nextButton->getRight() + gapS, (h - repeatSize) / 2, repeatSize, repeatSize);
+    shuffleButton->setBounds (coreX - gapS - repeatSize, (h - repeatSize) / 2, repeatSize, repeatSize);
 
     // volume: right-aligned before the grid, a full slider when there is room, else just the icon
     const int volSpace = qx - gapL - (repeatButton->getRight() + gapL);
@@ -528,7 +565,7 @@ void HeaderView::resized()
     volume->setBounds (qx - gapL - volW, h / 2 - 22, volW, 44);
 
     // text gets everything left of the transport
-    textBounds = { textX, kPad + 2, juce::jmax (0, juce::jmin (420, coreX - gapL - textX)), inner - 4 };
+    textBounds = { textX, kPad + 2, juce::jmax (0, juce::jmin (420, shuffleButton->getX() - gapL - textX)), inner - 4 };
 
     if (onLayoutChanged) onLayoutChanged();
 }
@@ -537,5 +574,11 @@ void HeaderView::mouseUp (const juce::MouseEvent& e)
 {
     if (artArea().contains (e.getPosition()) && onOpen)
         onOpen();
+    // the clock is always on the bottom line of the text: click switches elapsed / remaining
+    else if (textBounds.withTrimmedTop (textBounds.getHeight() - 16).contains (e.getPosition()) && timeLine.isNotEmpty() && onTimeClicked)
+    {
+        onTimeClicked();
+        repaint (textArea().expanded (0, 10));
+    }
 }
 } // namespace tp

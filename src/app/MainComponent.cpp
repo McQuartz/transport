@@ -182,6 +182,8 @@ MainComponent::MainComponent (bool isHeadless)
     header.onPrev = [this] { skip (-1); };
     header.onNext = [this] { skip (1); };
     header.onRepeat = [this] { setRepeat ((repeatMode + 1) % 3); };
+    header.onShuffle = [this] { setShuffle (! shuffle); };
+    header.onTimeClicked = [this] { showRemaining = ! showRemaining; saveSettings(); };
     header.onOpen = [this] { showOpenDialog(); };
     header.onVolumeChanged = [this] (float v) { engine.setVolume (v); saveSettings(); };
     header.onQuickAction = [this] (int i, QuickAction a) { runQuickAction (i, a); };
@@ -236,8 +238,12 @@ MainComponent::MainComponent (bool isHeadless)
         waveHeight = juce::jlimit (kMinWave, kMaxWave, settings->getIntValue ("waveHeight", 56));
         setUiScale ((float) settings->getDoubleValue ("uiScale", 1.0));
         taskbarPlayer = settings->getBoolValue ("taskbarPlayer", true);
+        smoothAnimations = settings->getBoolValue ("smoothAnimations", true);
         repeatMode = juce::jlimit (0, 2, settings->getIntValue ("repeat", 0));
         header.setRepeat (repeatMode);
+        shuffle = settings->getBoolValue ("shuffle", false);
+        header.setShuffle (shuffle);
+        showRemaining = settings->getBoolValue ("showRemaining", false);
     }
     engine.setEffectChain (slotGrid.effectChain());
 
@@ -266,8 +272,13 @@ MainComponent::MainComponent (bool isHeadless)
             juce::MessageManager::callAsync ([this, error] { toast ("Audio device: " + error); });
 
         const juce::File last (settings->getValue ("lastFile"));
-        if (last.existsAsFile())
-            openFile (last, false);
+        if (last.existsAsFile() && openFile (last, false))
+        {
+            // carry on where the last session stopped (unless that was the very end)
+            const double resume = settings->getDoubleValue ("lastPosition", 0.0);
+            if (resume > 1.0 && resume < engine.getLength() - 2.0)
+                engine.setPosition (resume);
+        }
 
         vblank = juce::VBlankAttachment (this, [this] (double ts) { onVBlank (ts); });
 
@@ -355,7 +366,11 @@ bool MainComponent::openFile (const juce::File& file, bool autoplay)
     loopA = loopB = -1.0;
     waveform.setLoop (loopA, loopB);
 
-    playlist = siblingAudioFiles (file);
+    if (! (droppedPlaylist && playlist.contains (file)))
+    {
+        droppedPlaylist = false;
+        playlist = siblingAudioFiles (file);
+    }
     playIndex = playlist.indexOf (file);
 
     if (auto* top = getTopLevelComponent())
@@ -454,7 +469,16 @@ void MainComponent::onVBlank (double ts)
 {
     const float dt = lastTimestamp > 0.0 ? (float) juce::jlimit (0.0, 0.1, ts - lastTimestamp) : 1.0f / 60.0f;
     lastTimestamp = ts;
-    tickFrame (dt);
+
+    // every other frame at 30 fps: when chosen, or while Transport is in the background
+    // (the meters stay readable, and drawing, the expensive part, halves)
+    if (! smoothAnimations || ! juce::Process::isForegroundProcess())
+    {
+        oddFrame = ! oddFrame;
+        if (oddFrame) { heldDt += dt; return; }
+    }
+    tickFrame (dt + heldDt);
+    heldDt = 0.0f;
 }
 
 void MainComponent::tickFrame (float dt)
@@ -505,7 +529,7 @@ void MainComponent::tickFrame (float dt)
     if (engine.hasFinished() && engine.getLength() > 0.0 && ! headless)
     {
         if (repeatMode == 2) engine.play();   // starts again from the top
-        else if (playIndex >= 0 && (playIndex + 1 < playlist.size() || repeatMode == 1)) skip (1);
+        else if (playIndex >= 0 && (playIndex + 1 < playlist.size() || repeatMode == 1 || (shuffle && playlist.size() > 1))) skip (1);
         else { engine.pause(); engine.setPosition (0.0); }
     }
 
@@ -530,7 +554,9 @@ void MainComponent::tickFrame (float dt)
 
     waveform.setPosition (engine.getSmoothPosition(), engine.getLength());
     header.setPlaying (engine.isPlaying());
-    header.setTimeLine (engine.getLength() > 0.0 ? formatClock (engine.getSmoothPosition()) + " / " + formatClock (engine.getLength()) : juce::String());
+    if (engine.getLength() <= 0.0) header.setTimeLine ({});
+    else if (showRemaining) header.setTimeLine (utf8 ("\xe2\x88\x92") + formatClock (juce::jmax (0.0, engine.getLength() - engine.getSmoothPosition())) + " / " + formatClock (engine.getLength()));
+    else header.setTimeLine (formatClock (engine.getSmoothPosition()) + " / " + formatClock (engine.getLength()));
 
     // 4. animations
     for (auto* a : std::initializer_list<Animated*> { &titleBar, &header, &waveform, &slotGrid, &browser, &videoView })
@@ -580,7 +606,8 @@ void MainComponent::paintOverChildren (juce::Graphics& g)
     {
         g.setFont (theme::font (12.5f, true));
         const float w = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), toastText) + 36.0f;
-        auto r = juce::Rectangle<float> (w, 32).withCentre ({ (float) getWidth() * 0.5f, (float) waveform.getBottom() + 10.0f - 8.0f * (1.0f - toastAlpha.current) });
+        // bottom centre, over the plugins' lower edge, so it never hides a plugin's title bar
+        auto r = juce::Rectangle<float> (w, 32).withCentre ({ (float) getWidth() * 0.5f, (float) getHeight() - 30.0f + 8.0f * (1.0f - toastAlpha.current) });
         g.setColour (theme::titleBlock.withAlpha (0.94f * toastAlpha.current));
         g.fillRoundedRectangle (r, 16.0f);
         g.setColour (theme::accent.withAlpha (toastAlpha.current));
@@ -647,7 +674,9 @@ juce::Component::WindowControlKind MainComponent::controlAt (juce::Point<float> 
 bool MainComponent::keyPressed (const juce::KeyPress& k)
 {
     const auto mods = k.getModifiers();
-    if (k == juce::KeyPress::spaceKey)       { header.onPlayPause(); return true; }
+    if (k == juce::KeyPress::spaceKey || k.getKeyCode() == juce::KeyPress::playKey) { header.onPlayPause(); return true; }
+    if (k.getKeyCode() == juce::KeyPress::fastForwardKey) { skip (1); return true; }
+    if (k.getKeyCode() == juce::KeyPress::rewindKey)      { skip (-1); return true; }
     if (k == juce::KeyPress::leftKey)        { engine.setPosition (engine.getSmoothPosition() - (mods.isShiftDown() ? 30.0 : 5.0)); return true; }
     if (k == juce::KeyPress::rightKey)       { engine.setPosition (engine.getSmoothPosition() + (mods.isShiftDown() ? 30.0 : 5.0)); return true; }
     if (k == juce::KeyPress::upKey)          { engine.setVolume (engine.getVolume() + 0.05f); header.setVolume (engine.getVolume()); return true; }
@@ -658,6 +687,7 @@ bool MainComponent::keyPressed (const juce::KeyPress& k)
     if (k.getTextCharacter() == 'm')         { runQuickAction (-1, QuickAction::mono); return true; }
     if (k.getTextCharacter() == 'l')         { runQuickAction (-1, QuickAction::abLoop); return true; }
     if (k.getTextCharacter() == 'r')         { setRepeat ((repeatMode + 1) % 3); return true; }
+    if (k.getTextCharacter() == 's')         { setShuffle (! shuffle); return true; }
     if (k.getTextCharacter() == 'v' && videoLoaded) { setShowVideo (! showVideo); return true; }
     if (k.getTextCharacter() == 'f' && videoLoaded) { setFullscreenVideo (! videoFullscreen); return true; }
     if (k == juce::KeyPress::escapeKey && videoFullscreen)  { setFullscreenVideo (false); return true; }
@@ -670,19 +700,35 @@ bool MainComponent::keyPressed (const juce::KeyPress& k)
 bool MainComponent::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (auto& f : files)
-        if (isAudioFile (juce::File (f))) return true;
+        if (isAudioFile (juce::File (f)) || juce::File (f).isDirectory()) return true;
     return false;
 }
 
 void MainComponent::filesDropped (const juce::StringArray& files, int, int)
 {
     dropGlow.target = 0.0f;
+    // several files: they become the playlist, in the order given; one file: its folder is the playlist
+    juce::Array<juce::File> dropped;
     for (auto& f : files)
-        if (isAudioFile (juce::File (f)))
-        {
-            openFile (juce::File (f), true);
-            return;
-        }
+    {
+        const juce::File file (f);
+        if (file.isDirectory())
+            for (auto& c : file.findChildFiles (juce::File::findFiles, false))
+            {
+                if (isAudioFile (c)) dropped.add (c);
+            }
+        else if (isAudioFile (file)) dropped.add (file);
+    }
+    if (dropped.isEmpty()) return;
+    if (dropped.size() > 1 || juce::File (files[0]).isDirectory())
+    {
+        if (juce::File (files[0]).isDirectory()) dropped = siblingAudioFiles (dropped[0]);   // folder: in name order
+        playlist = dropped;
+        droppedPlaylist = true;
+        shuffleHistory.clear();
+        toast (juce::String (dropped.size()) + " tracks in the playlist");
+    }
+    openFile (dropped[0], true);
 }
 
 //==============================================================================
@@ -704,7 +750,22 @@ void MainComponent::skip (int direction)
     if (direction < 0 && engine.getSmoothPosition() > 3.0) { engine.setPosition (0.0); return; }
 
     int next = playIndex + direction;
-    if (repeatMode == 1)
+    if (shuffle && playlist.size() > 1)
+    {
+        if (direction > 0)
+        {
+            // a random other track; repeat-all decides nothing here, shuffle keeps going
+            if (playIndex >= 0) shuffleHistory.push_back (playIndex);
+            next = random.nextInt (playlist.size() - 1);
+            if (next >= playIndex) ++next;
+        }
+        else if (! shuffleHistory.empty())
+        {
+            next = shuffleHistory.back();
+            shuffleHistory.pop_back();
+        }
+    }
+    else if (repeatMode == 1)
         next = (next + playlist.size()) % playlist.size();   // repeat all wraps round the folder
     if (juce::isPositiveAndBelow (next, playlist.size()))
     {
@@ -740,6 +801,7 @@ void MainComponent::showMainMenu()
     if (defaultplayer::isSupported())
         m.addItem (10, utf8 ("Set as default audio player\xe2\x80\xa6"), true, defaultplayer::isDefault());
     m.addItem (5, "Compact mode", true, compact);
+    m.addItem (14, "Smooth animations (60 fps)", true, smoothAnimations);
    #if JUCE_WINDOWS
     m.addItem (9, "Taskbar mini player", true, taskbarPlayer);
    #endif
@@ -777,6 +839,12 @@ void MainComponent::showMainMenu()
         else if (r == 11) self.setShowVideo (! self.showVideo);
         else if (r == 12) self.setFullscreenVideo (! self.videoFullscreen);
         else if (r == 13) self.showIconColourMenu();
+        else if (r == 14)
+        {
+            self.smoothAnimations = ! self.smoothAnimations;
+            self.toast (self.smoothAnimations ? "60 fps" : "30 fps: less CPU");
+            self.saveSettings();
+        }
         else if (r == 9)
         {
             self.taskbarPlayer = ! self.taskbarPlayer;
@@ -788,6 +856,15 @@ void MainComponent::showMainMenu()
         else if (r >= 300) { self.waveform.setStyle ((WaveformView::Style) (r - 300)); self.saveSettings(); }
         else if (r > 200) { self.quickColumns = r - 200; self.quick.resize ((size_t) self.quickColumns * 2, QuickAction::open); self.applyQuickActions(); self.saveSettings(); }
     });
+}
+
+void MainComponent::setShuffle (bool on)
+{
+    shuffle = on;
+    shuffleHistory.clear();
+    header.setShuffle (on);
+    toast (on ? "Shuffle on" : "Shuffle off");
+    saveSettings();
 }
 
 void MainComponent::setRepeat (int mode)
@@ -1126,6 +1203,19 @@ juce::Image MainComponent::renderMiniPlayer (int width, int height)
     return img;
 }
 
+NowPlaying MainComponent::nowPlaying()
+{
+    NowPlaying n;
+    n.hasTrack = engine.currentFile() != juce::File();
+    n.title = currentTitle;
+    n.artist = currentArtist;
+    n.cover = currentCover;
+    n.length = engine.getLength();
+    n.position = engine.getSmoothPosition();
+    n.playing = engine.isPlaying();
+    return n;
+}
+
 juce::String MainComponent::miniPlayerKey()
 {
     return currentTitle + (engine.isPlaying() ? "|play|" : "|pause|") + juce::String ((int) engine.getSmoothPosition());
@@ -1184,7 +1274,11 @@ void MainComponent::saveSettings()
     s->setValue ("waveHeight", waveHeight);
     s->setValue ("uiScale", (double) uiScale);
     s->setValue ("taskbarPlayer", taskbarPlayer);
+    s->setValue ("smoothAnimations", smoothAnimations);
     s->setValue ("repeat", repeatMode);
+    s->setValue ("shuffle", shuffle);
+    s->setValue ("showRemaining", showRemaining);
+    if (engine.currentFile() != juce::File()) s->setValue ("lastPosition", engine.getSmoothPosition());
     s->setValue ("showVideo", showVideo);
     s->setValue ("waveStyle", WaveformView::styleIds()[(int) waveform.getStyle()]);
     s->setValue ("slotStates", juce::JSON::toString (juce::var (slotGrid.getStates()), true));

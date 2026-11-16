@@ -21,6 +21,7 @@ public:
     void setPlaying (bool playing);
     /** 0 = off, 1 = repeat all, 2 = repeat one. */
     void setRepeat (int mode);
+    void setShuffle (bool on);
     void setVolume (float v);
     void setQuickActions (const std::vector<QuickAction>& actions, int columns);
     void setQuickActive (QuickAction a, bool active);
@@ -29,7 +30,7 @@ public:
     /** Right edge of the cover column, so the title bar's MENU block can line up with it. */
     int coverRight() const { return artArea().getRight(); }
 
-    std::function<void()> onPrev, onPlayPause, onNext, onOpen, onRepeat;
+    std::function<void()> onPrev, onPlayPause, onNext, onOpen, onRepeat, onShuffle, onTimeClicked;
     std::function<void (float)> onVolumeChanged;
     std::function<void (int index, QuickAction)> onQuickAction;
     std::function<void (int index)> onQuickRightClick;
@@ -50,7 +51,8 @@ private:
     juce::Rectangle<int> textArea() const { return textBounds; }
     void paintArt (juce::Graphics&, juce::Rectangle<float>, const juce::Image&, float alpha);
 
-    std::unique_ptr<IconButton> prevButton, playButton, nextButton, repeatButton;
+    std::unique_ptr<IconButton> prevButton, playButton, nextButton, repeatButton, shuffleButton;
+    juce::Rectangle<int> timeArea;   // where the clock line is drawn (click: elapsed / remaining)
     std::unique_ptr<VolumeSlider> volume;
     std::vector<std::unique_ptr<QuickButton>> quick;
     int quickColumns = 2;

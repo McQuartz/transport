@@ -5,6 +5,7 @@
 #include "core/Analyzer.h"
 #include "AudioEngine.h"
 #include "HeaderView.h"
+#include "MediaControls.h"
 #include "PluginBrowser.h"
 #include "SlotGrid.h"
 #include "TitleBar.h"
@@ -45,6 +46,7 @@ public:
     bool isPlayingNow()   { return engine.isPlaying(); }
     juce::Image renderMiniPlayer (int width, int height);
     juce::String miniPlayerKey();
+    NowPlaying nowPlaying();
     /** 0 off, 1 repeat all, 2 repeat one. */
     void setRepeat (int mode);
     bool isTaskbarPlayerEnabled() const { return taskbarPlayer; }
@@ -118,6 +120,11 @@ private:
     juce::Array<juce::File> playlist;
     int playIndex = -1;
     int repeatMode = 0;   // 0 off, 1 all (wraps round the folder), 2 one
+    bool shuffle = false, showRemaining = false;
+    bool droppedPlaylist = false;          // the playlist is a set of dropped files, not the folder
+    std::vector<int> shuffleHistory;       // indices played in shuffle, so Previous goes back
+    juce::Random random;
+    void setShuffle (bool);
     void showIconColourMenu();
     void applyIconColour (const juce::String& setting);
     double loopA = -1.0, loopB = -1.0;
@@ -145,5 +152,8 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
     juce::VBlankAttachment vblank;
     double lastTimestamp = 0.0;
+    bool smoothAnimations = true;   // 60 fps; off = 30 fps. Always 30 fps while another app has the focus
+    float heldDt = 0.0f;
+    bool oddFrame = false;
 };
 } // namespace tp

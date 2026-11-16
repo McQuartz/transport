@@ -102,6 +102,7 @@ target_sources(Transport PRIVATE
     src/app/WaveformView.cpp
     src/app/TitleBar.cpp
     src/app/TaskbarPlayer.cpp
+    src/app/MediaControls.cpp
     src/app/DefaultPlayer.cpp
     src/app/DocIcon.cpp
     src/app/VideoPlayer.cpp
@@ -111,12 +112,13 @@ target_sources(Transport PRIVATE
 
 # ---------------------------------------------------------------- video backend (the platform's own decoders)
 if(WIN32)
-    target_sources(Transport PRIVATE src/app/media/MediaWindows.cpp)
+    target_sources(Transport PRIVATE src/app/media/MediaWindows.cpp src/app/MediaControlsWindows.cpp)
     target_link_libraries(Transport PRIVATE mfplat mfreadwrite mfuuid)
     set(TRANSPORT_VIDEO "Media Foundation")
 elseif(APPLE)
-    target_sources(Transport PRIVATE src/app/media/MediaMac.mm)
-    set_source_files_properties(src/app/media/MediaMac.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+    target_sources(Transport PRIVATE src/app/media/MediaMac.mm src/app/MediaControlsMac.mm)
+    set_source_files_properties(src/app/media/MediaMac.mm src/app/MediaControlsMac.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+    target_link_libraries(Transport PRIVATE "-framework MediaPlayer")
     target_link_libraries(Transport PRIVATE "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo")
     set(TRANSPORT_VIDEO "AVFoundation")
 else()
@@ -139,7 +141,7 @@ if(APPLE)
     target_link_libraries(Transport PRIVATE "-framework CoreServices")
 endif()
 if(WIN32)
-    target_link_libraries(Transport PRIVATE dwmapi comctl32 ole32 uuid shell32)
+    target_link_libraries(Transport PRIVATE dwmapi comctl32 ole32 uuid shell32 windowsapp)
 endif()
 
 target_include_directories(Transport PRIVATE src ${TRANSPORT_GEN_DIR})

@@ -61,7 +61,7 @@ Rectangle<float> PluginBrowser::cardsViewport() const
     return panelArea().withTrimmedTop (kHeader).withTrimmedLeft (kSidebar).reduced (kPad);
 }
 
-int PluginBrowser::columnsForWidth() const { return cardsViewport().getWidth() > 700.0f ? 3 : 2; }
+int PluginBrowser::columnsForWidth() const { const float w = cardsViewport().getWidth(); return w > 700.0f ? 3 : (w > 440.0f ? 2 : 1); }   // cards stay wide enough for their names
 
 std::vector<int> PluginBrowser::visibleCards() const
 {
@@ -182,7 +182,10 @@ void PluginBrowser::paint (juce::Graphics& g)
     }
     g.setColour (Colour (0xffc4c4c4));
     g.setFont (theme::font (11.0f));
-    g.drawFittedText ("Drag slots to reorder.\nRight-click a slot for more.", side.reduced (16, 14).removeFromBottom (40).toNearestInt(), juce::Justification::bottomLeft, 2);
+    // the hint only where it doesn't cover the category list
+    const auto hint = side.reduced (16, 14).removeFromBottom (40);
+    if (categories.isEmpty() || categoryArea (categories.size() - 1).getBottom() + 8.0f <= hint.getY())
+        g.drawFittedText ("Drag slots to reorder.\nRight-click a slot for more.", hint.toNearestInt(), juce::Justification::bottomLeft, 2);
 
     // cards
     const auto view = cardsViewport();

@@ -62,8 +62,9 @@ inline QuickAction actionFromId (const juce::String& id, QuickAction fallback)
     return fallback;
 }
 
-/** Which monitor glyph to draw (for comparing designs). */
-inline int& quickIconVariant() { static int v = 0; return v; }
+/** Which icon set to draw: 0 = the original set, 1 = new set with faders, 2 = new set with headphones
+    (shipped). Kept so --quick-icons can show the designs side by side. */
+inline int& quickIconVariant() { static int v = 2; return v; }   // 2 = the current set (headphones)
 
 /** Draws the button glyph. Icons for the prototype's four buttons, compact monograms for the rest. */
 inline void drawQuickActionIcon (juce::Graphics& g, QuickAction a, juce::Rectangle<float> r, juce::Colour c)

@@ -2,6 +2,7 @@
 #include "media/Media.h"
 #include "VideoPlayer.h"
 #include "TaskbarPlayer.h"
+#include "MediaControls.h"
 #include "DocIcon.h"
 
 namespace tp
@@ -80,11 +81,20 @@ public:
         taskbar->renderPreview = [this] (int w, int h) { return content->renderMiniPlayer (w, h); };
         taskbar->stateKey = [this] { return content->miniPlayerKey(); };
         taskbar->setEnabled (content->isTaskbarPlayerEnabled());
+
+        media = std::make_unique<MediaControls> (*this);
+        media->onPlayPause = [this] { content->togglePlayback(); };
+        media->onPlay = [this] { if (! content->isPlayingNow()) content->togglePlayback(); };
+        media->onPause = [this] { if (content->isPlayingNow()) content->togglePlayback(); };
+        media->onNext = [this] { content->nextTrack(); };
+        media->onPrev = [this] { content->previousTrack(); };
+        media->state = [this] { return content->nowPlaying(); };
         content->onTaskbarPlayerChanged = [this] (bool on) { taskbar->setEnabled (on); };
     }
 
     ~MainWindow() override
     {
+        media.reset();
         taskbar.reset();
         storeWindowState (getWindowStateAsString());
     }
@@ -149,6 +159,7 @@ private:
     MainComponent* content = nullptr;
     std::unique_ptr<juce::ResizableBorderComponent> edges;
     std::unique_ptr<TaskbarPlayer> taskbar;
+    std::unique_ptr<MediaControls> media;
 };
 
 //==============================================================================
@@ -372,7 +383,7 @@ int runQuickIcons (const juce::StringArray& args)
             drawQuickActionIcon (g, list[k].action, r, juce::Colour (0xff9e9e9e));
         }
     }
-    quickIconVariant() = 0;
+    quickIconVariant() = 2;
     out.deleteFile();
     juce::FileOutputStream stream (out);
     juce::PNGImageFormat png;
