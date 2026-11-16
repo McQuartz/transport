@@ -95,7 +95,7 @@ public:
         {
             const auto b = buttonRect (i).translated (0.0f, 10.0f * (1.0f - easeOutCubic (a)));
             const float h = buttons[i].hover.current;
-            g.setColour ((i == 0 ? theme::accent.interpolatedWith (juce::Colours::white, 0.2f * h) : tp::C (0xff3a3a3a).interpolatedWith (tp::C (0xff4a4a4a), h)).withAlpha (a));
+            g.setColour ((i == 0 ? theme::accent.interpolatedWith (juce::Colours::white, 0.2f * h) : juce::Colour (0xff1b1b1e).interpolatedWith (juce::Colour (0xff1c1c1e), h)).withAlpha (a));
             g.fillRoundedRectangle (b, 5.0f);
             g.setColour ((i == 0 ? theme::titleBlock : juce::Colours::white).withAlpha (a));
             g.setFont (theme::font (11.0f, i == 0));
@@ -587,12 +587,13 @@ void MainComponent::paint (juce::Graphics& g)
 
 void MainComponent::paintOverChildren (juce::Graphics& g)
 {
-    if (tp::studio() || tp::style() == 5 || tp::style() == 3)
+    // hairlines frame the header and the waveform
+    if (header.isVisible())
     {
-        g.setColour (tp::style() == 3 ? juce::Colours::black.withAlpha (0.5f) : tp::C (0xff707070));
+        g.setColour (theme::hairline);
+        g.fillRect (0, header.getY(), getWidth(), 1);
         g.fillRect (0, header.getBottom() - 1, getWidth(), 1);
         g.fillRect (0, waveform.getBottom() - 1, getWidth(), 1);
-        g.fillRect (0, header.getY(), getWidth(), 1);
     }
     if (dropGlow.current > 0.01f)
     {
@@ -1182,7 +1183,7 @@ juce::Image MainComponent::renderMiniPlayer (int width, int height)
         g.drawImage (currentCover, art, juce::RectanglePlacement::fillDestination);
     else
     {
-        g.setColour (tp::C (0xff1c1c1c));
+        g.setColour (juce::Colour (0xff111113));
         g.fillEllipse (art);
         g.setColour (theme::accent);
         g.fillEllipse (art.withSizeKeepingCentre (art.getWidth() * 0.3f, art.getHeight() * 0.3f));
@@ -1193,7 +1194,7 @@ juce::Image MainComponent::renderMiniPlayer (int width, int height)
     g.setColour (theme::text);
     g.setFont (theme::font (px, true));
     g.drawText (currentTitle.isNotEmpty() ? currentTitle : juce::String ("Transport"), text.removeFromTop (px * 1.5f), juce::Justification::centredLeft, true);
-    g.setColour (tp::C (0xffc8c8c8));
+    g.setColour (juce::Colour (0xffc9c9ce));
     g.setFont (theme::font (px * 0.8f));
     g.drawText (currentArtist, text.removeFromTop (px * 1.3f), juce::Justification::centredLeft, true);
 
@@ -1203,7 +1204,7 @@ juce::Image MainComponent::renderMiniPlayer (int width, int height)
     g.drawText (formatClock (pos).fromFirstOccurrenceOf (":", false, false) + " / " + formatClock (len).fromFirstOccurrenceOf (":", false, false),
                 bottom, juce::Justification::centredRight, false);
     auto bar = text.removeFromBottom (px * 0.5f).withHeight (juce::jmax (2.0f, px * 0.18f));
-    g.setColour (tp::C (0xff595959));
+    g.setColour (juce::Colour (0xff252528));
     g.fillRoundedRectangle (bar, bar.getHeight() * 0.5f);
     g.setColour (theme::accent);
     g.fillRoundedRectangle (bar.withWidth (bar.getWidth() * (float) (len > 0.0 ? pos / len : 0.0)), bar.getHeight() * 0.5f);

@@ -12,7 +12,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TILE = (28, 28, 28, 255)        # #1c1c1c
 LIGHT = (242, 242, 242, 255)    # #f2f2f2
 GREY = (85, 85, 85, 255)        # #555555
-ACCENT = (232, 163, 58, 255)    # theme::accent #e8a33a
+ACCENT = (255, 101, 38, 255)    # theme::accent #ff6526
 
 # geometry in a 1024 box
 TILE_BOX, TILE_RADIUS = (64, 64, 960, 960), 200

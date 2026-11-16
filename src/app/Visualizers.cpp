@@ -63,7 +63,7 @@ juce::Font fitFont (juce::Font f, const juce::String& t, float width, float minS
 void drawLabel (juce::Graphics& g, const juce::String& t, Rectangle<float> r, juce::Justification j = juce::Justification::centredLeft, Colour c = theme::label, float px = 10.0f)
 {
     g.setColour (c);
-    auto f = tp::style() == 2 ? theme::mono (px * 0.95f, false) : theme::font (px);
+    auto f = theme::font (px);
     const float minScale = juce::jmax (0.7f, 7.0f * 1.33f / f.getHeight());
     g.setFont (fitFont (f, t, r.getWidth(), juce::jmin (1.0f, minScale)));
     g.drawText (t, r, j, true);
@@ -124,7 +124,7 @@ private:
         const auto face = Rectangle<float> (0, 0, 300, 190);
         juce::Path clip;
         clip.addRoundedRectangle (face, 8.0f);
-        g.setColour (tp::C (0xff5f5f5f));
+        g.setColour (Colour (0xff2b2b2f));
         g.fillPath (clip);
         g.reduceClipRegion (clip);
         juce::ColourGradient shade (juce::Colours::black.withAlpha (0.18f), 0, 0, juce::Colours::transparentBlack, 0, 40, false);
@@ -138,7 +138,7 @@ private:
         g.strokePath (arc, juce::PathStrokeType (1.6f));
         juce::Path red;
         red.addCentredArc (cx, cy, R + 3.0f, R + 3.0f, 0, degToRad (12), degToRad (48), true);
-        g.setColour (tp::C (0xff8e8e8e).interpolatedWith (theme::accent, 0.25f + leds[ch].current * 0.6f));
+        g.setColour (Colour (0xff7d7d85).interpolatedWith (theme::accent, 0.25f + leds[ch].current * 0.6f));
         g.strokePath (red, juce::PathStrokeType (5.0f));
 
         static const std::pair<float, const char*> db[] = { { -46, "20" }, { -37, "10" }, { -28, "7" }, { -20, "5" }, { -10, "3" }, { -3, "2" },
@@ -150,7 +150,7 @@ private:
             g.addTransform (juce::AffineTransform::rotation (degToRad (deg), cx, cy));
             g.setColour (theme::scale);
             g.drawLine (cx, cy - R, cx, cy - R - 9, 1.6f);
-            g.setColour (deg > 11.0f ? tp::C (0xfff0d4a8) : tp::C (0xffdedede));
+            g.setColour (deg > 11.0f ? Colour (0xffe4a48d) : Colour (0xffe1e1e4));
             g.setFont (juce::Font (juce::FontOptions (theme::sansName(), 15.0f, juce::Font::bold)));
             g.drawText (txt, Rectangle<float> (cx - 18, cy - R - 28, 36, 17), juce::Justification::centred, false);
         }
@@ -160,12 +160,12 @@ private:
             g.addTransform (juce::AffineTransform::rotation (degToRad (deg), cx, cy));
             g.setColour (theme::scale);
             g.drawLine (cx, cy - R, cx, cy - R + 6, 1.2f);
-            g.setColour (tp::C (0xffc8c8c8));
+            g.setColour (Colour (0xffc9c9ce));
             g.setFont (theme::font (8.5f));
             g.drawText (txt, Rectangle<float> (cx - 16, cy - R + 7, 32, 12), juce::Justification::centred, false);
         }
 
-        g.setColour (tp::C (0xffcfcfcf));
+        g.setColour (Colour (0xffd2d2d6));
         g.setFont (juce::Font (juce::FontOptions (theme::sansName(), 17.0f, juce::Font::bold)));
         g.drawText ("VU", Rectangle<float> (cx - 40, 112, 80, 20), juce::Justification::centred, false);
         if (channel != nullptr)
@@ -176,7 +176,7 @@ private:
 
         // peak lamp
         const Point<float> lamp (268, 30);
-        g.setColour (tp::C (0xff474747));
+        g.setColour (Colour (0xff1a1a1d));
         g.fillEllipse (Rectangle<float> (9, 9).withCentre (lamp));
         if (leds[ch].current > 0.01f)
         {
@@ -185,7 +185,7 @@ private:
             g.setColour (theme::accent.withAlpha (leds[ch].current));
             g.fillEllipse (Rectangle<float> (9, 9).withCentre (lamp));
         }
-        g.setColour (tp::C (0xffbdbdbd));
+        g.setColour (Colour (0xffbbbbc1));
         g.setFont (theme::font (8.0f, true));
         g.drawText ("PEAK", Rectangle<float> (lamp.x - 40, lamp.y - 6, 32, 12), juce::Justification::centredRight, false);
 
@@ -194,15 +194,15 @@ private:
         const Point<float> tip (cx + (R + 6.0f) * std::sin (a), cy - (R + 6.0f) * std::cos (a));
         g.setColour (juce::Colours::black.withAlpha (0.22f));
         g.drawLine ({ { cx + 2, cy }, tip.translated (2, 3) }, 2.2f);
-        g.setColour (tp::C (0xfff2f2f2));
+        g.setColour (Colour (0xfff3f3f4));
         g.drawLine ({ { cx, cy }, tip }, 1.8f);
         // hub cap centred on the pivot, so the needle always leaves it at the same point (a fixed anchor)
         const float hub = 50.0f;
-        g.setColour (tp::C (0xff3a3a3a));
+        g.setColour (Colour (0xff1b1b1e));
         g.fillEllipse (Rectangle<float> (hub * 2, hub * 2).withCentre ({ cx, cy }));
-        g.setColour (tp::C (0xff4a4a4a));
+        g.setColour (Colour (0xff1c1c1e));
         g.drawEllipse (Rectangle<float> (hub * 2, hub * 2).withCentre ({ cx, cy }), 1.0f);
-        g.setColour (tp::C (0xff4f4f4f));
+        g.setColour (Colour (0xff1e1e21));
         g.drawEllipse (Rectangle<float> (hub * 1.4f, hub * 1.4f).withCentre ({ cx, cy }), 1.0f);
     }
 
@@ -247,7 +247,7 @@ public:
 
         const float cx = 228.0f, cy = 262.0f, R = 220.0f;
 
-        g.setColour (tp::C (0xff9a9a9a));
+        g.setColour (Colour (0xff8d8d95));
         for (float r : { 220.0f, 185.0f, 140.0f, 95.0f, 50.0f })
         {
             juce::Path p;
@@ -270,7 +270,7 @@ public:
         for (int i = 0; i < kPolarBins; ++i)
             shape.lineTo (pointAt (i, R * fill[(size_t) i].current));
         shape.closeSubPath();
-        g.setColour (tp::C (0xff9a9a9a).withAlpha (0.92f));
+        g.setColour (Colour (0xff8d8d95).withAlpha (0.92f));
         g.fillPath (shape);
 
         juce::Path peak;
@@ -279,16 +279,16 @@ public:
             const auto p = pointAt (i, R * outline[(size_t) i].current);
             if (i == 0) peak.startNewSubPath (p); else peak.lineTo (p);
         }
-        g.setColour (tp::C (0xff262626));
+        g.setColour (Colour (0xff171719));
         g.strokePath (peak, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved));
 
         juce::Path hub;
         hub.addCentredArc (cx, cy, 24, 24, 0, degToRad (-90), degToRad (90), true);
         hub.closeSubPath();
-        g.setColour (tp::C (0xff7a7a7a));
+        g.setColour (Colour (0xff4a4a50));
         g.fillPath (hub);
 
-        g.setColour (tp::C (0xffc9c9c9));
+        g.setColour (Colour (0xffcacacf));
         g.setFont (theme::font (10));
         static const std::pair<float, const char*> labels[] = { { 10, "0" }, { 43, "-20" }, { 88, "-40" }, { 133, "-60" }, { 228, "-80" },
                                                                 { 323, "-60" }, { 368, "-40" }, { 413, "-20" }, { 446, "0" } };
@@ -357,7 +357,7 @@ public:
             const float peakW = juce::GlyphArrangement::getStringWidth (theme::font (10.0f), peakText);
             drawLabel (g, "SPECTRUM  dB / Hz", head, juce::Justification::centredLeft, theme::label, 10.0f);
             if (titleW + peakW + 16.0f <= head.getWidth())
-                drawLabel (g, peakText, head, juce::Justification::centredRight, tp::C (0xffd8d8d8), 10.0f);
+                drawLabel (g, peakText, head, juce::Justification::centredRight, Colour (0xffdcdcdf), 10.0f);
             area.removeFromTop (4);
         }
         auto scaleCol = area.removeFromLeft (28);
@@ -369,9 +369,9 @@ public:
         for (int db = 0; db >= (int) floorDb; db -= (area.getHeight() < 110.0f ? 36 : 18))
         {
             const float y = area.getY() + area.getHeight() * ((float) db / floorDb);
-            g.setColour (tp::C (0xff666666));
+            g.setColour (Colour (0xff323236));
             g.drawDashedLine ({ area.getX(), y, area.getRight(), y }, dash, 2, 1.0f);
-            g.setColour (tp::C (0xffcfcfcf));
+            g.setColour (Colour (0xffd2d2d6));
             g.drawText (juce::String (db), scaleCol.withY (y - 7).withHeight (14).withTrimmedRight (4), juce::Justification::centredRight, false);
         }
 
@@ -379,9 +379,9 @@ public:
         for (auto& [hz, txt] : freqs)
         {
             const float x = area.getX() + area.getWidth() * std::log (hz / 20.0f) / std::log (1000.0f);
-            g.setColour (tp::C (0xff606060));
+            g.setColour (Colour (0xff2c2c30));
             g.drawVerticalLine ((int) x, area.getY(), area.getBottom());
-            g.setColour (tp::C (0xffcfcfcf));
+            g.setColour (Colour (0xffd2d2d6));
             g.drawText (txt, Rectangle<float> (x - 18, freqRow.getY(), 36, 14), juce::Justification::centred, false);
         }
 
@@ -397,7 +397,7 @@ public:
             const float h = area.getHeight() * b.value.current;
             if (h > 0.5f)
             {
-                juce::ColourGradient grad (tp::C (0xfff2f2f2), 0, area.getBottom() - h, tp::C (0xffbdbdbd), 0, area.getBottom(), false);
+                juce::ColourGradient grad (Colour (0xfff3f3f4), 0, area.getBottom() - h, Colour (0xffbbbbc1), 0, area.getBottom(), false);
                 g.setGradientFill (grad);
                 g.fillRect (Rectangle<float> (x + gap * 0.5f, area.getBottom() - h, w - gap, h));
             }
@@ -502,7 +502,7 @@ private:
             return;
         }
         targetChip = Rectangle<float> (w, 16.0f).withPosition (row.getRight() - w, row.getY());
-        g.setColour (tp::C (0xff474747));
+        g.setColour (Colour (0xff1a1a1d));
         g.fillRoundedRectangle (targetChip, 8.0f);
         g.setColour (theme::accent);
         g.drawText (txt, targetChip, juce::Justification::centred, false);
@@ -518,11 +518,11 @@ private:
         {
             auto bar = bars.removeFromLeft (14);
             bars.removeFromLeft (6);
-            g.setColour (tp::C (0xff444444));
+            g.setColour (Colour (0xff19191b));
             g.fillRect (bar);
             const float v = i == 0 ? momentaryBar.current : shortBar.current;
             auto fillR = bar.withTop (bar.getBottom() - bar.getHeight() * v);
-            g.setColour (tp::C (0xffe2e2e2));
+            g.setColour (Colour (0xffe5e5e7));
             g.fillRect (fillR.withTop (juce::jmax (fillR.getY(), bar.getBottom() - bar.getHeight() * tgt)));
             if (v > tgt)
             {
@@ -531,11 +531,11 @@ private:
             }
             g.setColour (juce::Colours::white);
             g.drawHorizontalLine ((int) (bar.getBottom() - bar.getHeight() * tgt), bar.getX() - 2, bar.getRight() + 2);
-            drawLabel (g, i == 0 ? "M" : "S", bar.withY (bar.getBottom() + 1).withHeight (12), juce::Justification::centred, tp::C (0xffcfcfcf), 9.5f);
+            drawLabel (g, i == 0 ? "M" : "S", bar.withY (bar.getBottom() + 1).withHeight (12), juce::Justification::centred, Colour (0xffd2d2d6), 9.5f);
         }
 
         auto big = r.removeFromTop (juce::jmin (62.0f, r.getHeight() * 0.48f));
-        drawLabel (g, "Integrated", big.removeFromTop (13), juce::Justification::centredLeft, tp::C (0xffcfcfcf), 10.0f);
+        drawLabel (g, "Integrated", big.removeFromTop (13), juce::Justification::centredLeft, Colour (0xffd2d2d6), 10.0f);
         float diff = integrated > -70.0f ? integrated - kTargets[target].lufs : 0.0f;
         if (std::abs (diff) < 0.05f) diff = 0.0f;
         g.setColour (integrated > -70.0f && diff > 1.0f ? theme::accent : theme::text);
@@ -543,9 +543,9 @@ private:
         const auto txt = formatDb (integrated);
         g.drawText (txt, big, juce::Justification::centredLeft, false);
         const float tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), txt);
-        drawLabel (g, "LUFS", big.withTrimmedLeft (tw + 6).withTrimmedTop (big.getHeight() * 0.25f), juce::Justification::centredLeft, tp::C (0xffd8d8d8), 11.0f);
+        drawLabel (g, "LUFS", big.withTrimmedLeft (tw + 6).withTrimmedTop (big.getHeight() * 0.25f), juce::Justification::centredLeft, Colour (0xffdcdcdf), 11.0f);
         if (integrated > -70.0f)
-            drawLabel (g, (diff > 0 ? "+" : "") + juce::String (diff, 1) + " LU vs target", big, juce::Justification::bottomRight, tp::C (0xffbdbdbd), 9.5f);
+            drawLabel (g, (diff > 0 ? "+" : "") + juce::String (diff, 1) + " LU vs target", big, juce::Justification::bottomRight, Colour (0xffbbbbc1), 9.5f);
 
         const std::pair<const char*, juce::String> cells[] = {
             { "Momentary", formatDb (momentary) }, { "Short-term", formatDb (shortTerm) },
@@ -554,7 +554,7 @@ private:
         for (int i = 0; i < 4; ++i)
         {
             auto c = Rectangle<float> (r.getX() + colW * (float) (i % 2), r.getY() + rowH * (float) (i / 2), colW, rowH);
-            drawLabel (g, cells[i].first, c.removeFromTop (12), juce::Justification::centredLeft, tp::C (0xffcfcfcf), 9.5f);
+            drawLabel (g, cells[i].first, c.removeFromTop (12), juce::Justification::centredLeft, Colour (0xffd2d2d6), 9.5f);
             g.setColour (i == 3 && truePeak > -1.0f ? theme::accent : theme::text);
             g.setFont (theme::mono (13.0f));
             g.drawText (cells[i].second, c, juce::Justification::centredLeft, false);
@@ -563,7 +563,7 @@ private:
 
     void paintHistory (juce::Graphics& g, Rectangle<float> graph)
     {
-        g.setColour (tp::C (0xff4b4b4b));
+        g.setColour (Colour (0xff1c1c1f));
         g.fillRect (graph);
         const float t = kTargets[target].lufs;
         const float lo = t - 18.0f, hi = t + 8.0f;
@@ -575,10 +575,10 @@ private:
         g.setColour (theme::accent.withAlpha (0.7f));
         g.drawDashedLine ({ graph.getX(), toY (t), graph.getRight(), toY (t) }, dash, 2, 1.0f);
         g.setFont (theme::font (9.0f));
-        g.setColour (tp::C (0xffcfcfcf));
+        g.setColour (Colour (0xffd2d2d6));
         for (float v : { hi - 2.0f, t, lo + 2.0f })
             g.drawText (juce::String (v, 0), Rectangle<float> (graph.getRight() - 30, toY (v) - 12, 28, 11), juce::Justification::centredRight, false);
-        drawLabel (g, "short-term, last 60 s", graph.reduced (6, 3).removeFromTop (12), juce::Justification::centredLeft, tp::C (0xffbdbdbd), 9.0f);
+        drawLabel (g, "short-term, last 60 s", graph.reduced (6, 3).removeFromTop (12), juce::Justification::centredLeft, Colour (0xffbbbbc1), 9.0f);
 
         if (history.size() > 1)
         {
@@ -592,7 +592,7 @@ private:
                 const float x = x0 + step * (float) i, y = toY (history[i]);
                 if (! started) { p.startNewSubPath (x, y); started = true; } else p.lineTo (x, y);
             }
-            g.setColour (tp::C (0xffededed));
+            g.setColour (Colour (0xffefeff0));
             g.strokePath (p, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved));
         }
     }
@@ -602,9 +602,9 @@ private:
         auto bars = area.removeFromBottom (8);
         area.removeFromBottom (6);
         const float tgt = (kTargets[target].lufs + 48.0f) / 48.0f;
-        g.setColour (tp::C (0xff444444));
+        g.setColour (Colour (0xff19191b));
         g.fillRect (bars);
-        g.setColour (tp::C (0xffe2e2e2));
+        g.setColour (Colour (0xffe5e5e7));
         g.fillRect (bars.withWidth (bars.getWidth() * juce::jmin (shortBar.current, tgt)));
         if (shortBar.current > tgt)
         {
@@ -616,7 +616,7 @@ private:
         drawLabel (g, "LOUDNESS  LUFS", top, juce::Justification::centredLeft, theme::label, 10.0f);
         paintTargetChip (g, top);
         drawLabel (g, "M " + formatDb (momentary) + "   S " + formatDb (shortTerm) + "   LRA " + juce::String (range, 1),
-                   area.removeFromBottom (14), juce::Justification::centredLeft, tp::C (0xffcfcfcf), 10.0f);
+                   area.removeFromBottom (14), juce::Justification::centredLeft, Colour (0xffd2d2d6), 10.0f);
         g.setColour (theme::text);
         drawValue (g, formatDb (integrated), area, theme::mono (juce::jlimit (14.0f, 30.0f, area.getHeight() * 0.7f)));
     }
@@ -652,7 +652,7 @@ public:
         {
             juce::Graphics g (phosphor);
             const float cx = (float) w * 0.5f, cy = (float) h * 0.5f, R = (float) juce::jmin (w, h) * 0.5f;
-            g.setColour (tp::C (0xfff4f4f4).withAlpha (0.45f));
+            g.setColour (Colour (0xfff5f5f6).withAlpha (0.45f));
             for (int i = kScopeSize - 1024; i < kScopeSize; ++i)
             {
                 const float l = f.left[(size_t) i], r = f.right[(size_t) i];
@@ -673,11 +673,11 @@ public:
         diamond.startNewSubPath (c.x, c.y - R);
         diamond.lineTo (c.x + R, c.y); diamond.lineTo (c.x, c.y + R); diamond.lineTo (c.x - R, c.y);
         diamond.closeSubPath();
-        g.setColour (tp::C (0xff7c7c7c));
+        g.setColour (Colour (0xff505056));
         g.strokePath (diamond, juce::PathStrokeType (1.0f));
 
         const float dash[] = { 3.0f, 3.0f };
-        g.setColour (tp::C (0xff6e6e6e));
+        g.setColour (Colour (0xff3b3b40));
         g.drawDashedLine ({ c.x, c.y - R, c.x, c.y + R }, dash, 2, 1.0f);
         g.drawDashedLine ({ c.x - R, c.y, c.x + R, c.y }, dash, 2, 1.0f);
         g.drawDashedLine ({ c.x - R * 0.5f, c.y - R * 0.5f, c.x + R * 0.5f, c.y + R * 0.5f }, dash, 2, 1.0f);
@@ -686,7 +686,7 @@ public:
         g.drawImage (phosphor, area);
         drawLabel (g, getWidth() < 120 ? "GONIO" : "GONIOMETER", getLocalBounds().toFloat().reduced (12, 8).removeFromTop (14), juce::Justification::centredLeft, theme::label, 10.0f);
 
-        g.setColour (tp::C (0xffd8d8d8));
+        g.setColour (Colour (0xffdcdcdf));
         g.setFont (theme::font (10));
         g.drawText ("M", Rectangle<float> (c.x - 8, c.y - R - 15, 16, 12), juce::Justification::centred, false);
         g.drawText ("L", Rectangle<float> (c.x - R * 0.5f - 18, c.y - R * 0.5f - 18, 16, 12), juce::Justification::centred, false);
@@ -736,22 +736,22 @@ public:
 
         auto drawBar = [&] (Rectangle<float> r, float pos01, bool fillFromCentre, const juce::String& a, const juce::String& b, const juce::String& c)
         {
-            g.setColour (tp::C (0xff444444));
+            g.setColour (Colour (0xff19191b));
             g.fillRect (r);
-            g.setColour (tp::C (0xff8a8a8a));
+            g.setColour (Colour (0xff75757c));
             g.drawVerticalLine ((int) r.getCentreX(), r.getY(), r.getBottom());
             const float x = r.getX() + r.getWidth() * juce::jlimit (0.0f, 1.0f, pos01);
             if (fillFromCentre)
             {
-                g.setColour (tp::C (0xffe2e2e2));
+                g.setColour (Colour (0xffe5e5e7));
                 g.fillRect (Rectangle<float>::leftTopRightBottom (juce::jmin (x, r.getCentreX()), r.getY() + 4, juce::jmax (x, r.getCentreX()), r.getBottom() - 4));
             }
-            g.setColour (fillFromCentre ? theme::accent : tp::C (0xffe2e2e2));
+            g.setColour (fillFromCentre ? theme::accent : Colour (0xffe5e5e7));
             g.fillRect (Rectangle<float> (x - 1.5f, r.getY() - 3, 3.0f, r.getHeight() + 6));
             auto labels = Rectangle<float> (r.getX(), r.getBottom() + 3, r.getWidth(), 12);
-            drawLabel (g, a, labels, juce::Justification::centredLeft, tp::C (0xffcfcfcf), 9.5f);
-            drawLabel (g, b, labels, juce::Justification::centred, tp::C (0xffcfcfcf), 9.5f);
-            drawLabel (g, c, labels, juce::Justification::centredRight, tp::C (0xffcfcfcf), 9.5f);
+            drawLabel (g, a, labels, juce::Justification::centredLeft, Colour (0xffd2d2d6), 9.5f);
+            drawLabel (g, b, labels, juce::Justification::centred, Colour (0xffd2d2d6), 9.5f);
+            drawLabel (g, c, labels, juce::Justification::centredRight, Colour (0xffd2d2d6), 9.5f);
         };
 
         area.removeFromTop (6);
@@ -784,7 +784,7 @@ public:
             else
             {
                 image = juce::Image (juce::Image::RGB, w, h, true);
-                juce::Graphics (image).fillAll (tp::C (0xff464646));
+                juce::Graphics (image).fillAll (Colour (0xff1a1a1c));
             }
         }
 
@@ -819,7 +819,7 @@ public:
         }
 
         g.setFont (theme::font (9.5f));
-        g.setColour (tp::C (0xffcfcfcf));
+        g.setColour (Colour (0xffd2d2d6));
         static const std::pair<float, const char*> marks[] = { { 10000, "10k" }, { 1000, "1k" }, { 100, "100" } };
         for (auto& [hz, txt] : marks)
         {
@@ -834,7 +834,7 @@ private:
     static Colour colourFor (float v)
     {
         v = juce::jlimit (0.0f, 1.0f, v);
-        const Colour stops[] = { tp::C (0xff464646), tp::C (0xff8a8a8a), theme::accent, tp::C (0xfffff4de) };
+        const Colour stops[] = { Colour (0xff1a1a1c), Colour (0xff75757c), theme::accent, Colour (0xfff4d7cc) };
         const float pos[] = { 0.0f, 0.45f, 0.78f, 1.0f };
         for (int i = 1; i < 4; ++i)
             if (v <= pos[i])
@@ -876,7 +876,7 @@ public:
     {
         drawLabel (g, "OSCILLOSCOPE", getLocalBounds().toFloat().reduced (12, 8).removeFromTop (14), juce::Justification::centredLeft, theme::label, 10.0f);
         auto area = getLocalBounds().toFloat().reduced (12, 14).withTrimmedTop (10);
-        g.setColour (tp::C (0xff666666));
+        g.setColour (Colour (0xff323236));
         const float dash[] = { 3.0f, 3.0f };
         g.drawDashedLine ({ area.getX(), area.getCentreY(), area.getRight(), area.getCentreY() }, dash, 2, 1.0f);
         for (int i = 1; i < 8; ++i)
@@ -892,9 +892,9 @@ public:
             const float y = area.getCentreY() - juce::jlimit (-1.0f, 1.0f, samples[i] * gain.current) * half;
             if (i == 0) p.startNewSubPath (x, y); else p.lineTo (x, y);
         }
-        g.setColour (tp::C (0xffffffff).withAlpha (0.12f));
+        g.setColour (Colour (0xffffffff).withAlpha (0.12f));
         g.strokePath (p, juce::PathStrokeType (5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour (tp::C (0xfff0f0f0));
+        g.setColour (Colour (0xfff1f1f3));
         g.strokePath (p, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
 
@@ -938,11 +938,11 @@ public:
         for (int db : { 0, -6, -12, -18, -24, -36, -48 })
         {
             const float y = area.getBottom() - area.getHeight() * norm ((float) db);
-            g.setColour (tp::C (0xff6a6a6a));
+            g.setColour (Colour (0xff36363b));
             g.drawHorizontalLine ((int) y, area.getX(), area.getRight());
             if (y - lastLabelY < 13.0f) continue;   // too close to the one above: line only
             lastLabelY = y;
-            g.setColour (tp::C (0xffcfcfcf));
+            g.setColour (Colour (0xffd2d2d6));
             g.drawText (juce::String (db), scaleCol.withY (y - 7).withHeight (14), juce::Justification::centredRight, false);
         }
 
@@ -952,14 +952,14 @@ public:
             const auto& m = meters[c];
             auto bar = Rectangle<float> (area.getX() + (float) c * (barW + 12.0f), area.getY() + 10, barW, area.getHeight() - 10);
             auto clipLamp = Rectangle<float> (bar.getX(), area.getY(), barW, 6);
-            g.setColour (tp::C (0xff474747).interpolatedWith (theme::accent, m.clip));
+            g.setColour (Colour (0xff1a1a1d).interpolatedWith (theme::accent, m.clip));
             g.fillRect (clipLamp);
 
-            g.setColour (tp::C (0xff444444));
+            g.setColour (Colour (0xff19191b));
             g.fillRect (bar);
-            g.setColour (tp::C (0xff9a9a9a));
+            g.setColour (Colour (0xff8d8d95));
             g.fillRect (bar.withTop (bar.getBottom() - bar.getHeight() * m.peak.current));
-            g.setColour (tp::C (0xffe8e8e8));
+            g.setColour (Colour (0xffeaeaec));
             g.fillRect (bar.withTop (bar.getBottom() - bar.getHeight() * m.rms.current).reduced (4, 0));
             g.setColour (theme::accent);
             g.fillRect (Rectangle<float> (bar.getX(), bar.getBottom() - bar.getHeight() * m.hold - 1.0f, barW, 2.0f));
@@ -1010,10 +1010,10 @@ public:
             {
                 const auto r = Rectangle<float> (area.getX() + (float) i * bw + 2.0f, area.getBottom() - (float) (s + 1) * sh + 1.5f, bw - 4.0f, sh - 3.0f);
                 const float pos = (float) s / (float) (segs - 1);
-                const Colour on = pos > 0.88f ? tp::C (0xfffff4de) : (pos > 0.68f ? theme::accent : tp::C (0xffd8d8d8));
+                const Colour on = pos > 0.88f ? Colour (0xfff4d7cc) : (pos > 0.68f ? theme::accent : Colour (0xffdcdcdf));
                 if (s < lit)                      g.setColour (on);
                 else if (s == peakSeg && b.peak > 0.02f) g.setColour (on.withAlpha (0.85f));
-                else                              g.setColour (tp::C (0xff4c4c4c));
+                else                              g.setColour (Colour (0xff1d1d20));
                 g.fillRoundedRectangle (r, 1.5f);
             }
         }

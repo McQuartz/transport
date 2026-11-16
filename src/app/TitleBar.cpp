@@ -61,7 +61,7 @@ void TitleBar::paint (juce::Graphics& g)
     const auto menu = menuArea();
     if (! kMacStyle)
     {
-        g.setColour (theme::titleBlock.interpolatedWith (tp::C (0xff262626), hover[0].current));
+        g.setColour (theme::titleBlock.interpolatedWith (juce::Colour (0xff171719), hover[0].current));
         g.fillRect (menu);
     }
     else if (hover[0].current > 0.01f)
@@ -77,9 +77,9 @@ void TitleBar::paint (juce::Graphics& g)
         const float hv = hover[0].current * 0.5f;
         logo::paintMark (g, juce::Rectangle<float> (21.0f, 19.0f).withCentre ({ lx + 10.5f, cy }),
                          logo::light.interpolatedWith (juce::Colours::white, hv),
-                         logo::grey.interpolatedWith (tp::C (0xff6a6a6a), hv));
+                         logo::grey.interpolatedWith (juce::Colour (0xff6a6a6a), hv));
     }
-    g.setColour (tp::C (0xffe6e6e6));
+    g.setColour (juce::Colour (0xffe8e8eb));
     g.setFont (theme::font (11.0f, true));
     g.drawText ("MENU", menu.withTrimmedLeft (36), juce::Justification::centredLeft, false);
 
@@ -106,7 +106,7 @@ void TitleBar::paint (juce::Graphics& g)
     // window controls
     if (kMacStyle)
     {
-        const juce::Colour lights[] = { tp::C (0xffff5f57), tp::C (0xfffebc2e), tp::C (0xff28c840) };
+        const juce::Colour lights[] = { juce::Colour (0xffff5f57), juce::Colour (0xfffebc2e), juce::Colour (0xff28c840) };
         const int order[] = { 2, 0, 1 };   // close, minimise, zoom (left to right)
         const float anyHover = juce::jmax (hover[1].current, hover[2].current, hover[3].current);
         for (int k = 0; k < 3; ++k)
@@ -134,10 +134,10 @@ void TitleBar::paint (juce::Graphics& g)
         const float hv = hover[i + 1].current;
         if (hv > 0.01f)
         {
-            g.setColour (i == 2 ? tp::C (0xffc42b1c).withAlpha (hv) : juce::Colours::white.withAlpha (0.08f * hv));
+            g.setColour (i == 2 ? juce::Colour (0xffc42b1c).withAlpha (hv) : juce::Colours::white.withAlpha (0.08f * hv));
             g.fillRect (r);
         }
-        g.setColour (tp::C (0xffd6d6d6).interpolatedWith (juce::Colours::white, hv));
+        g.setColour (juce::Colour (0xffdadade).interpolatedWith (juce::Colours::white, hv));
         const float cx = std::floor (r.getCentreX()) + 0.5f, cyy = std::floor (r.getCentreY()) + 0.5f;
         if (i == 0)
         {

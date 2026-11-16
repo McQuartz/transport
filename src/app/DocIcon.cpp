@@ -16,7 +16,7 @@ Scheme schemeFor (juce::Colour page)
     Scheme s;
     s.page = page.withAlpha (1.0f);
     s.fold = lightPage ? s.page.darker (0.22f) : s.page.brighter (0.45f);
-    s.text = lightPage ? tp::C (0xff1c1c1c) : juce::Colours::white;
+    s.text = lightPage ? juce::Colour (0xff1c1c1c) : juce::Colours::white;
     s.rim  = lightPage ? juce::Colours::black.withAlpha (0.18f) : juce::Colours::white.withAlpha (0.39f);
 
     // the orange marks would vanish on an orange-ish page: use the text colour there

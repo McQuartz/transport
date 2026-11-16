@@ -91,9 +91,9 @@ public:
         for (int db : { 12, 6, 0, -6, -12 })
         {
             const float y = gainToY ((float) db);
-            g.setColour (db == 0 ? tp::C (0xff787878) : tp::C (0xff626262));
+            g.setColour (db == 0 ? Colour (0xff45454b) : Colour (0xff2e2e32));
             g.drawHorizontalLine ((int) y, area.getX(), area.getRight());
-            g.setColour (tp::C (0xffcfcfcf));
+            g.setColour (Colour (0xffd2d2d6));
             g.drawText ((db > 0 ? "+" : "") + juce::String (db), Rectangle<float> (getLocalBounds().toFloat().getX() + 4, y - 7, 24, 14), juce::Justification::centredRight, false);
         }
         static const std::pair<float, const char*> freqs[] = { { 50, "50" }, { 100, "100" }, { 200, "200" }, { 500, "500" }, { 1000, "1k" }, { 2000, "2k" }, { 5000, "5k" }, { 10000, "10k" } };
@@ -101,12 +101,12 @@ public:
         for (auto& [hz, txt] : freqs)
         {
             const float x = freqToX (hz);
-            g.setColour (tp::C (0xff5e5e5e));
+            g.setColour (Colour (0xff2a2a2e));
             g.drawVerticalLine ((int) x, area.getY(), area.getBottom());
             const float tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), txt);
             if (x - tw * 0.5f < lastLabelRight + 4.0f) continue;   // crowded: skip this label
             lastLabelRight = x + tw * 0.5f;
-            g.setColour (tp::C (0xffcfcfcf));
+            g.setColour (Colour (0xffd2d2d6));
             g.drawText (txt, Rectangle<float> (x - 18, area.getBottom() + 2, 36, 13), juce::Justification::centred, false);
         }
 
@@ -129,7 +129,7 @@ public:
 
         // response curve
         if (curveDirty) rebuildCurve();
-        const auto curveColour = theme::accent.interpolatedWith (tp::C (0xff9a9a9a), bypassFade.current);
+        const auto curveColour = theme::accent.interpolatedWith (Colour (0xff8d8d95), bypassFade.current);
         juce::Path fill (curve);
         fill.lineTo (area.getRight(), gainToY (0.0f));
         fill.lineTo (area.getX(), gainToY (0.0f));
@@ -151,7 +151,7 @@ public:
                 g.setColour (curveColour.withAlpha (0.25f * h));
                 g.fillEllipse (Rectangle<float> (r * 3.2f, r * 3.2f).withCentre (p));
             }
-            g.setColour (active ? curveColour : tp::C (0xffd8d8d8));
+            g.setColour (active ? curveColour : Colour (0xffdcdcdf));
             g.fillEllipse (Rectangle<float> (r * 2, r * 2).withCentre (p));
             g.setColour (theme::titleBlock);
             g.setFont (theme::font (8.5f, true));
@@ -315,19 +315,19 @@ public:
         // transfer curve
         auto toX = [&] (float db) { return graph.getX() + graph.getWidth() * (db + 60.0f) / 60.0f; };
         auto toY = [&] (float db) { return graph.getBottom() - graph.getHeight() * (db + 60.0f) / 60.0f; };
-        g.setColour (tp::C (0xff4b4b4b));
+        g.setColour (Colour (0xff1c1c1f));
         g.fillRect (graph);
         g.setFont (theme::font (9.0f));
         for (int db : { -12, -24, -36, -48 })
         {
-            g.setColour (tp::C (0xff5c5c5c));
+            g.setColour (Colour (0xff28282b));
             g.drawVerticalLine ((int) toX ((float) db), graph.getY(), graph.getBottom());
             g.drawHorizontalLine ((int) toY ((float) db), graph.getX(), graph.getRight());
-            g.setColour (tp::C (0xffcfcfcf));
+            g.setColour (Colour (0xffd2d2d6));
             g.drawText (juce::String (db), Rectangle<float> (graph.getX() - 24, toY ((float) db) - 6, 20, 12), juce::Justification::centredRight, false);
         }
         const float dash[] = { 3.0f, 3.0f };
-        g.setColour (tp::C (0xff7a7a7a));
+        g.setColour (Colour (0xff4a4a50));
         g.drawDashedLine ({ graph.getX(), graph.getBottom(), graph.getRight(), graph.getY() }, dash, 2, 1.0f);
 
         const float t = comp->thresholdDb, ratio = comp->ratio, knee = comp->kneeDb, makeup = comp->makeupDb;
@@ -337,7 +337,7 @@ public:
             const float out = juce::jlimit (-60.0f, 0.0f, Compressor::curve (in, t, ratio, knee) + makeup);
             if (in == -60.0f) p.startNewSubPath (toX (in), toY (out)); else p.lineTo (toX (in), toY (out));
         }
-        const auto col = comp->bypass ? tp::C (0xff9a9a9a) : theme::accent;
+        const auto col = comp->bypass ? Colour (0xff8d8d95) : theme::accent;
         g.setColour (col);
         g.strokePath (p, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved));
 
@@ -353,7 +353,7 @@ public:
 
         // gain reduction meter
         auto bar = meter.withTrimmedBottom (16);
-        g.setColour (tp::C (0xff444444));
+        g.setColour (Colour (0xff19191b));
         g.fillRect (bar);
         const float frac = juce::jlimit (0.0f, 1.0f, grShown.current / 24.0f);
         g.setColour (theme::accent);
@@ -434,7 +434,7 @@ public:
         auto r = getLocalBounds().toFloat().reduced (10, 8).withTrimmedTop (18);
         r.removeFromBottom ((float) juce::jlimit (48, 68, getHeight() / 3) + 6.0f);
 
-        g.setColour (tp::C (0xff4b4b4b));
+        g.setColour (Colour (0xff1c1c1f));
         g.fillRect (r);
 
         const float ceiling = lim->ceilingDb;
@@ -445,7 +445,7 @@ public:
             const auto& h = history[(size_t) ((writePos + i) % kHistory)];
             const float x = r.getX() + (float) i * w;
             const float y = levelY (h.second);
-            g.setColour (tp::C (0xffbdbdbd).withAlpha (0.55f));
+            g.setColour (Colour (0xffbbbbc1).withAlpha (0.55f));
             g.fillRect (Rectangle<float> (x, y, w + 0.5f, r.getBottom() - y));
             const float grH = r.getHeight() * juce::jlimit (0.0f, 1.0f, h.first / 12.0f);
             if (grH > 0.5f)
@@ -460,7 +460,7 @@ public:
         // readouts next to the knobs
         auto info = getLocalBounds().toFloat().reduced (10, 8).removeFromBottom ((float) juce::jlimit (48, 68, getHeight() / 3));
         info = info.withTrimmedLeft (juce::jmin (90.0f, info.getWidth() / 4.0f) * 3.0f + 10.0f);
-        plug::drawLabel (g, info.getWidth() < 90.0f ? "GR" : "Gain reduction", info.removeFromTop (14), juce::Justification::centredLeft, tp::C (0xffcfcfcf), 9.5f);
+        plug::drawLabel (g, info.getWidth() < 90.0f ? "GR" : "Gain reduction", info.removeFromTop (14), juce::Justification::centredLeft, Colour (0xffd2d2d6), 9.5f);
         g.setColour (grShown.current > 0.1f ? theme::accent : theme::text);
         plug::drawValue (g, "-" + juce::String (std::abs (grShown.current), 1) + " dB", info, theme::mono (juce::jlimit (14.0f, 24.0f, info.getHeight() * 0.6f)), juce::Justification::centredLeft);
     }

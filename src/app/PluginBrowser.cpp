@@ -129,7 +129,7 @@ void PluginBrowser::paint (juce::Graphics& g)
     juce::DropShadow (juce::Colours::black.withAlpha (0.55f), 40, { 0, 18 }).drawForRectangle (g, panel.toNearestInt());
     g.setColour (theme::dialog);
     g.fillRect (panel);
-    g.setColour (tp::C (0xff5c5c5c));
+    g.setColour (Colour (0xff28282b));
     g.drawRect (panel, 1.0f);
 
     // header
@@ -140,14 +140,14 @@ void PluginBrowser::paint (juce::Graphics& g)
     g.setFont (theme::font (14.0f, true));
     const juce::String title = slot < 0 ? "ADD PLUGIN" : "REPLACE PLUGIN";
     g.drawText (title, header.withTrimmedLeft (20), juce::Justification::centredLeft, false);
-    g.setColour (tp::C (0xffbdbdbd));
+    g.setColour (Colour (0xffbbbbc1));
     g.setFont (theme::font (13.0f));
     const float titleW = juce::GlyphArrangement::getStringWidth (theme::font (14.0f, true), title);
     g.drawText (slot < 0 ? utf8 ("\xe2\x86\x92 new slot") : utf8 ("\xe2\x86\x92 slot ") + juce::String (slot + 1),
                 header.withTrimmedLeft (30 + titleW), juce::Justification::centredLeft, false);
 
     const auto ca = closeArea();
-    g.setColour (tp::C (0xff3a3a3a).withAlpha (closeHover.current));
+    g.setColour (Colour (0xff1b1b1e).withAlpha (closeHover.current));
     g.fillRoundedRectangle (ca.reduced (6), 3.0f);
     g.setColour (theme::accent.interpolatedWith (juce::Colours::white, closeHover.current * 0.4f));
     const auto cc = ca.getCentre();
@@ -156,14 +156,14 @@ void PluginBrowser::paint (juce::Graphics& g)
 
     // sidebar
     auto side = panel.withTrimmedTop (kHeader).withWidth (kSidebar);
-    g.setColour (tp::C (0xff2f2f2f));
+    g.setColour (Colour (0xff1b1b1e));
     g.fillRect (side);
     const auto& reg = visualizerRegistry();
     for (int i = 0; i < categories.size(); ++i)
     {
         const auto r = categoryArea (i);
         const float h = categoryHover[(size_t) i].current;
-        g.setColour (tp::C (0xff454545).withAlpha (h * (i == selectedCategory ? 1.0f : 0.6f)));
+        g.setColour (Colour (0xff19191c).withAlpha (h * (i == selectedCategory ? 1.0f : 0.6f)));
         g.fillRect (r);
         if (i == selectedCategory)
         {
@@ -176,11 +176,11 @@ void PluginBrowser::paint (juce::Graphics& g)
 
         int count = 0;
         for (auto& v : reg) if (i == 0 || v.category == categories[i]) ++count;
-        g.setColour (tp::C (0xffc4c4c4));
+        g.setColour (Colour (0xffc4c4ca));
         g.setFont (theme::font (11.0f));
         g.drawText (juce::String (count), r.withTrimmedRight (16), juce::Justification::centredRight, false);
     }
-    g.setColour (tp::C (0xffc4c4c4));
+    g.setColour (Colour (0xffc4c4ca));
     g.setFont (theme::font (11.0f));
     // the hint only where it doesn't cover the category list
     const auto hint = side.reduced (16, 14).removeFromBottom (40);
@@ -203,9 +203,9 @@ void PluginBrowser::paint (juce::Graphics& g)
         if (! r.intersects (view.expanded (4))) continue;
 
         g.beginTransparencyLayer (stagger);
-        g.setColour (tp::C (0xff3d3d3d).interpolatedWith (tp::C (0xff474747), h));
+        g.setColour (Colour (0xff17171a).interpolatedWith (Colour (0xff1a1a1d), h));
         g.fillRoundedRectangle (r, 4.0f);
-        g.setColour (tp::C (0xff4f4f4f).interpolatedWith (theme::accent, h * 0.85f));
+        g.setColour (Colour (0xff1e1e21).interpolatedWith (theme::accent, h * 0.85f));
         g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, 1.0f);
 
         auto inner = r.reduced (12);
@@ -213,9 +213,9 @@ void PluginBrowser::paint (juce::Graphics& g)
         inner.removeFromLeft (12);
         g.setColour (theme::deep);
         g.fillRoundedRectangle (tile, 3.0f);
-        g.setColour (tp::C (0xff5c5c5c));
+        g.setColour (Colour (0xff28282b));
         g.drawRoundedRectangle (tile, 3.0f, 1.0f);
-        g.setColour (tp::C (0xffe0e0e0).interpolatedWith (theme::accent, h));
+        g.setColour (Colour (0xffe3e3e6).interpolatedWith (theme::accent, h));
         g.setFont (theme::mono (12.0f));
         g.drawText (info.monogram, tile, juce::Justification::centred, false);
 
@@ -231,7 +231,7 @@ void PluginBrowser::paint (juce::Graphics& g)
         g.setFont (theme::font (13.5f, true));
         g.drawText (info.name, nameRow, juce::Justification::centredLeft, true);
 
-        g.setColour (tp::C (0xffd0d0d0));
+        g.setColour (Colour (0xffd3d3d7));
         g.setFont (theme::font (11.5f));
         g.drawFittedText (info.description, inner.removeFromTop (40).toNearestInt(), juce::Justification::topLeft, 2, 1.0f);
         g.endTransparencyLayer();

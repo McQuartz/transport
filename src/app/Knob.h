@@ -50,7 +50,7 @@ public:
 
         juce::Path track, fill;
         track.addCentredArc (c.x, c.y, radius - 2, radius - 2, 0, start, end, true);
-        g.setColour (tp::C (0xff3f3f3f));
+        g.setColour (juce::Colour (0xff161619));
         g.strokePath (track, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
         const float zero = lo < 0.0f && hi > 0.0f ? start + (end - start) * toNorm (0.0f) : start;
@@ -59,9 +59,9 @@ public:
         g.strokePath (fill, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
         const float bodyR = radius - 7.0f + hover.current * 1.0f;
-        g.setColour (tp::C (0xff6a6a6a).interpolatedWith (tp::C (0xff7a7a7a), hover.current));
+        g.setColour (juce::Colour (0xff36363b).interpolatedWith (juce::Colour (0xff4a4a50), hover.current));
         g.fillEllipse (juce::Rectangle<float> (bodyR * 2, bodyR * 2).withCentre (c));
-        g.setColour (tp::C (0xff4a4a4a));
+        g.setColour (juce::Colour (0xff1c1c1e));
         g.drawEllipse (juce::Rectangle<float> (bodyR * 2, bodyR * 2).withCentre (c), 1.0f);
 
         const juce::Point<float> tip (c.x + std::sin (angle) * (bodyR - 3), c.y - std::cos (angle) * (bodyR - 3));

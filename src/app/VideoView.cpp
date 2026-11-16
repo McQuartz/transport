@@ -180,7 +180,7 @@ void VideoView::paint (juce::Graphics& g)
     const auto bounds = getLocalBounds().toFloat();
     const float radius = fullscreen ? 0.0f : 3.0f;
 
-    g.setColour (fullscreen ? juce::Colours::black : tp::C (0xff1a1a1a));
+    g.setColour (fullscreen ? juce::Colours::black : Colour (0xff0f0f11));
     g.fillRoundedRectangle (bounds, radius);
 
     const auto& picture = player.picture();
@@ -252,9 +252,9 @@ void VideoView::paint (juce::Graphics& g)
     for (int i = 0; i < count; ++i)
     {
         const auto r = buttonRect (i);
-        g.setColour (tp::C (0xff2e2e2e).interpolatedWith (tp::C (0xff4a4a4a), buttonHover[i].current).withAlpha (0.88f * cAlpha));
+        g.setColour (Colour (0xff1a1a1d).interpolatedWith (Colour (0xff1c1c1e), buttonHover[i].current).withAlpha (0.88f * cAlpha));
         g.fillRoundedRectangle (r, 3.0f);
-        g.setColour (tp::C (0xffd6d6d6).interpolatedWith (juce::Colours::white, buttonHover[i].current).withAlpha (cAlpha));
+        g.setColour (Colour (0xffdadade).interpolatedWith (juce::Colours::white, buttonHover[i].current).withAlpha (cAlpha));
         const auto cc = r.getCentre();
         juce::Path p;
         if (i == 0)
