@@ -24,7 +24,10 @@ Grab the newest **vX.Y.Z** release from the Releases page (a rolling *developmen
 - Click the time under the title to switch between elapsed and remaining. Transport resumes the last track where you stopped.
 - Drop several files or a folder to make them the playlist. Opening a file while Transport runs brings its window to the front.
 - **Media keys and system overlay:** play/pause/next/previous keys work; Windows shows the track in its media overlay, macOS in Control Center (Now Playing).
-- **Smooth animations:** MENU → Smooth animations (60 fps). Off: 30 fps. In the background Transport always runs at 30 fps and pauses analysis while minimised.
+- **Smooth animations:** MENU → Smooth animations (60 fps), also while another app has the focus. Off: 30 fps. Analysis pauses while minimised.
+- **Theme:** MENU → Theme → Dark, Ash (soft charcoal) or Light.
+- **Volume** goes up to +6 dB; the small mark on the fader is 0 dB and the handle catches there.
+- **Compact mode** shows just the header and the waveform; the plugins come back when you leave it.
 - **Customize layout** (MENU or the grid quick-access button): drag slots to reorder, set each slot to narrow/normal/wide/extra wide, add or replace plugins, and drag the orange handles to set the height of the header and waveform. The plugins pack themselves into rows that always fill the space. **Done** or Esc leaves the mode.
 - **Maximize a plugin:** double-click it (or the ⤢ button on hover) to fill the whole plugin area; Esc restores.
 - **Quick-access buttons** (top right): left-click runs, right-click assigns another function or changes the grid size (2×2, 3×2, 4×2). A short header shows one row.

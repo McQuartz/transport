@@ -117,15 +117,17 @@ private:
 class HeaderView::VolumeSlider final : public juce::Component, public Animated
 {
 public:
-    VolumeSlider() { setMouseCursor (juce::MouseCursor::PointingHandCursor); shown.snap (value); setTitle ("Volume"); }
+    VolumeSlider() { setMouseCursor (juce::MouseCursor::PointingHandCursor); shown.snap (value / maximum); setTitle ("Volume"); }
 
     std::function<void (float)> onChange;
     bool iconOnly = false;
+    float maximum = 1.0f;   // volume at the right end; 1 = 0 dB
 
+    float getValue() const { return value; }
     void setValue (float v, bool notify)
     {
-        value = juce::jlimit (0.0f, 1.0f, v);
-        shown.target = value;
+        value = juce::jlimit (0.0f, maximum, v);
+        shown.target = value / maximum;
         if (notify && onChange) onChange (value);
     }
 
@@ -145,7 +147,7 @@ public:
     }
     void mouseDrag (const juce::MouseEvent& e) override { if (! iconOnly && e.getMouseDownX() >= trackArea().getX() - 4) setFromX ((float) e.x); }
     void mouseUp (const juce::MouseEvent&) override    { drag.target = 0.0f; }
-    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& w) override { setValue (value + (w.deltaY + w.deltaX) * 0.25f, true); }
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& w) override { setValue (value + (w.deltaY + w.deltaX) * 0.25f * maximum, true); }
 
     void paint (juce::Graphics& g) override
     {
@@ -183,14 +185,27 @@ public:
         g.fillRect (line);
         g.setColour (theme::iconBright);
         g.fillRect (line.withWidth (line.getWidth() * shown.current));
+        if (maximum > 1.0f)
+        {
+            // 0 dB: a small tick above and below the line; past it the gain is a boost
+            const float x0 = line.getX() + line.getWidth() / maximum;
+            g.setColour (theme::icon);
+            g.fillRect (Rectangle<float> (1.0f, 9.0f).withCentre ({ x0, cy }));
+            if (shown.current * maximum > 1.0f)
+            {
+                g.setColour (theme::accent);
+                g.fillRect (Rectangle<float> (x0, line.getY(), line.getX() + line.getWidth() * shown.current - x0, line.getHeight()));
+            }
+        }
         const float x = line.getX() + line.getWidth() * shown.current;
         g.setColour (juce::Colours::white);
-        g.fillRect (Rectangle<float> (3.0f + drag.current, 18.0f + 2.0f * hover.current).withCentre ({ x, cy }));
+        g.fillRoundedRectangle (Rectangle<float> (2.5f + drag.current, 11.0f + 2.0f * hover.current).withCentre ({ x, cy }), 1.0f);
 
         // gain is value squared (AudioEngine), so dB = 40 log10 (value)
+        const float db = value > 0.0f ? 40.0f * std::log10 (value) : 0.0f;
         g.setColour (theme::label.interpolatedWith (juce::Colours::white, juce::jmax (hover.current, drag.current)));
         g.setFont (theme::mono (10.5f, false));
-        g.drawText (value <= 0.0f ? utf8 ("\xe2\x88\x92\xe2\x88\x9e dB") : juce::String (40.0f * std::log10 (value), 1) + " dB",
+        g.drawText (value <= 0.0f ? utf8 ("\xe2\x88\x92\xe2\x88\x9e dB") : (db >= 0.05f ? "+" : "") + juce::String (db, 1) + " dB",
                     Rectangle<float> (track.getRight() + 10.0f, cy - 8.0f, (float) kReadout - 10.0f, 16.0f),
                     juce::Justification::centredLeft, false);
     }
@@ -199,7 +214,13 @@ private:
     float trackY() const { return (float) getHeight() * 0.5f; }   // centred, so it lines up with the buttons
     static constexpr int kReadout = 64;   // room for "-12.3 dB" right of the line
     Rectangle<float> trackArea() const { return getLocalBounds().toFloat().withTrimmedLeft (28).withTrimmedRight ((float) kReadout); }
-    void setFromX (float x) { const auto t = trackArea(); setValue ((x - t.getX()) / t.getWidth(), true); }
+    void setFromX (float x)
+    {
+        const auto t = trackArea();
+        float v = juce::jlimit (0.0f, 1.0f, (x - t.getX()) / t.getWidth()) * maximum;
+        if (maximum > 1.0f && std::abs (v - 1.0f) * t.getWidth() / maximum < 4.0f) v = 1.0f;   // 0 dB catches the handle
+        setValue (v, true);
+    }
     void toggleMute()
     {
         if (value > 0.0f) { unmuted = value; setValue (0.0f, true); }
@@ -358,6 +379,7 @@ void HeaderView::setShuffle (bool on)
 }
 
 void HeaderView::setVolume (float v) { volume->setValue (v, false); }
+void HeaderView::setVolumeMaximum (float m) { volume->maximum = juce::jmax (1.0f, m); volume->setValue (volume->getValue(), false); }
 
 void HeaderView::setTimeLine (const juce::String& line)
 {
@@ -454,8 +476,13 @@ void HeaderView::paint (juce::Graphics& g)
 
     const auto text = textArea().toFloat();
     if (text.getWidth() < 40.0f) return;
-    const bool roomy = text.getHeight() >= 90.0f;
-    const float titlePx = roomy ? 17.0f : 15.0f;
+
+    // title, artist, then the file details and the clock on lines of their own, aligned with the
+    // cover's bottom edge. Two sizes only: the title, and everything else. When the header is low
+    // the whole block scales down together instead of lines being dropped or squashed into one.
+    const float k = juce::jlimit (0.72f, 1.0f, text.getHeight() / 88.0f);
+    const float titlePx = 15.5f * k, smallPx = 12.0f * k;
+    const float titleH = titlePx * 1.4f, smallH = smallPx * 1.38f;
 
     auto drawText = [&] (const juce::String& t, const juce::String& a, const juce::StringArray& lines, float alpha, float yOffset, bool withTime)
     {
@@ -463,35 +490,36 @@ void HeaderView::paint (juce::Graphics& g)
         auto r = text.translated (0, yOffset);
         g.setColour (theme::text.withAlpha (alpha));
         g.setFont (theme::font (titlePx, true));
-        g.drawText (t, r.withHeight (titlePx * 1.45f), juce::Justification::topLeft, true);
+        g.drawText (t, r.withHeight (titleH), juce::Justification::centredLeft, true);
         if (a.isNotEmpty())
         {
             g.setColour (Colour (0xffc9c9ce).withAlpha (alpha));
-            g.setFont (theme::font (titlePx * 0.78f));
-            g.drawText (a, r.withTrimmedTop (titlePx * 1.45f).withHeight (titlePx * 1.2f), juce::Justification::topLeft, true);
+            g.setFont (theme::font (smallPx));
+            g.drawText (a, r.withTrimmedTop (titleH).withHeight (smallH), juce::Justification::centredLeft, true);
         }
 
-        g.setFont (theme::mono (10.5f, false));
+        const auto metaFont = theme::mono (smallPx * 0.96f, false);
+        g.setFont (metaFont);
         g.setColour (Colour (0xffb5b5bc).withAlpha (alpha));
         juce::StringArray all;
-        if (roomy)
+        for (auto& l : lines)
         {
-            all = lines;
-            if (withTime && timeLine.isNotEmpty()) all.add (timeLine);
+            // items are separated by space alone; when the line is too long, items go from the end,
+            // whole (never "…")
+            auto items = juce::StringArray::fromTokens (l, "\t", "");
+            auto joined = [&] { return items.joinIntoString ("   "); };
+            while (items.size() > 1 && juce::GlyphArrangement::getStringWidth (metaFont, joined()) > r.getWidth())
+                items.remove (items.size() - 1);
+            all.add (joined());
         }
-        else
-        {
-            // the time comes first: when the line gets cut, the file details go, not the clock
-            juce::String one;
-            if (withTime && timeLine.isNotEmpty()) one << timeLine << utf8 ("  \xc2\xb7  ");
-            one << lines.joinIntoString (utf8 ("  \xc2\xb7  "));
-            all.add (one);
-        }
-        float y = r.getBottom() - 15.0f * (float) all.size();
+        if (withTime && timeLine.isNotEmpty()) all.add (timeLine);
+
+        float y = r.getBottom() - smallH * (float) all.size();
+        y = juce::jmax (y, r.getY() + titleH + (a.isNotEmpty() ? smallH : 0.0f));
         for (auto& l : all)
         {
-            g.drawText (l, Rectangle<float> (r.getX(), y, r.getWidth(), 15.0f), juce::Justification::centredLeft, true);
-            y += 15.0f;
+            g.drawText (l, Rectangle<float> (r.getX(), y, r.getWidth(), smallH), juce::Justification::centredLeft, false);
+            y += smallH;
         }
     };
 
@@ -568,7 +596,7 @@ void HeaderView::mouseUp (const juce::MouseEvent& e)
     if (artArea().contains (e.getPosition()) && onOpen)
         onOpen();
     // the clock is always on the bottom line of the text: click switches elapsed / remaining
-    else if (textBounds.withTrimmedTop (textBounds.getHeight() - 16).contains (e.getPosition()) && timeLine.isNotEmpty() && onTimeClicked)
+    else if (textBounds.withTrimmedTop (textBounds.getHeight() - 18).contains (e.getPosition()) && timeLine.isNotEmpty() && onTimeClicked)
     {
         onTimeClicked();
         repaint (textArea().expanded (0, 10));

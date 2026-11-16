@@ -51,7 +51,8 @@ private:
     class AnalysisJob;
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override { refreshBars(); }
-    juce::Rectangle<float> barArea() const { return getLocalBounds().toFloat().reduced (14, 6); }
+    // 6 px in from each side: the track starts and ends exactly over the plugin row's outer edges
+    juce::Rectangle<float> barArea() const { return getLocalBounds().toFloat().reduced (6, 6); }
     double xToTime (float x) const;
     float timeToX (double t) const;
     void paintStyle (juce::Graphics&, Style, float alpha, float playX);

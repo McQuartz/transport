@@ -1,4 +1,5 @@
 #include "Visualizers.h"
+#include "ThemeRender.h"
 
 namespace tp
 {
@@ -650,7 +651,8 @@ public:
 
         if (f.receivedAudio)
         {
-            juce::Graphics g (phosphor);
+            theme::ThemedGraphics tg (phosphor);   // the trace is painted into an image: theme it here
+            auto& g = tg.get();
             const float cx = (float) w * 0.5f, cy = (float) h * 0.5f, R = (float) juce::jmin (w, h) * 0.5f;
             g.setColour (Colour (0xfff5f5f6).withAlpha (0.45f));
             for (int i = kScopeSize - 1024; i < kScopeSize; ++i)

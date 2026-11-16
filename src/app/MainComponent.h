@@ -22,6 +22,9 @@ public:
     explicit MainComponent (bool headless = false);
     ~MainComponent() override;
 
+    bool isCompact() const { return compact; }
+    int heightOutsideCompact() const { return juce::jmax (360, expandedHeight); }
+
     bool openFile (const juce::File& file, bool autoplay);
     void tickFrame (float dt);   // one display frame; driven by vblank (or manually when headless)
 
@@ -79,7 +82,10 @@ private:
     void applyQuickActions();
     void skip (int direction);
     void setCompact (bool);
+    int compactHeight() const;
+    void lockCompactHeight();
     void setUiScale (float);
+    void setTheme (int mode);
     struct Heights { int header, wave; };
     Heights effectiveHeights() const;
     void saveSnapshot();
@@ -99,10 +105,17 @@ private:
     float silenceDebt = 0.0f;
     float settingsDirtyFor = -1.0f;   // >= 0: seconds since a plugin setting changed
 
+    struct Layer final : public juce::Component
+    {
+        std::function<void (juce::Graphics&)> onPaint;
+        void paint (juce::Graphics& g) override { if (onPaint) onPaint (g); }
+    };
+
     TitleBar titleBar;
     HeaderView header;
     WaveformView waveform;
     SlotGrid slotGrid;
+    Layer hairlines;
     PluginBrowser browser;
     VideoPlayer video;
     VideoView videoView { video };
@@ -152,7 +165,7 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
     juce::VBlankAttachment vblank;
     double lastTimestamp = 0.0;
-    bool smoothAnimations = true;   // 60 fps; off = 30 fps. Always 30 fps while another app has the focus
+    bool smoothAnimations = true;   // 60 fps (also in the background); off = 30 fps
     float heldDt = 0.0f;
     bool oddFrame = false;
 };

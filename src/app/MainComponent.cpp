@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "ThemeRender.h"
 #include "TrackInfo.h"
 #include "DefaultPlayer.h"
 #include "DocIcon.h"
@@ -141,17 +142,29 @@ MainComponent::MainComponent (bool isHeadless)
     popL.resize (8192);
     popR.resize (8192);
 
+    setCachedComponentImage (new theme::MappedPainter (*this));   // Ash / Light themes
     addAndMakeVisible (titleBar);
     addAndMakeVisible (header);
     addAndMakeVisible (waveform);
     addAndMakeVisible (slotGrid);
     addChildComponent (videoView);
+    // hairlines frame the header and the waveform; a layer of their own, so the plugin browser covers them
+    hairlines.onPaint = [this] (juce::Graphics& g)
+    {
+        if (! header.isVisible() || videoFullscreen) return;
+        g.setColour (theme::hairline);
+        g.fillRect (0, header.getY(), getWidth(), 1);
+        g.fillRect (0, header.getBottom() - 1, getWidth(), 1);
+        g.fillRect (0, waveform.getBottom() - 1, getWidth(), 1);
+    };
+    hairlines.setInterceptsMouseClicks (false, false);
+    addAndMakeVisible (hairlines);
     splitHeader = std::make_unique<Splitter>();
     splitWave = std::make_unique<Splitter>();
     addAndMakeVisible (*splitHeader);
     addAndMakeVisible (*splitWave);
-    splitHeader->onDrag = [this] (int dy) { headerHeight = juce::jlimit (HeaderView::kMinHeight, HeaderView::kMaxHeight, headerHeight + dy); resized(); };
-    splitWave->onDrag = [this] (int dy) { waveHeight = juce::jlimit (kMinWave, kMaxWave, waveHeight + dy); resized(); };
+    splitHeader->onDrag = [this] (int dy) { headerHeight = juce::jlimit (HeaderView::kMinHeight, HeaderView::kMaxHeight, headerHeight + dy); resized(); lockCompactHeight(); };
+    splitWave->onDrag = [this] (int dy) { waveHeight = juce::jlimit (kMinWave, kMaxWave, waveHeight + dy); resized(); lockCompactHeight(); };
     splitHeader->onDragEnd = splitWave->onDragEnd = [this] { saveSettings(); };
     addChildComponent (browser);
     defaultPrompt = std::make_unique<DefaultPrompt>();
@@ -185,6 +198,7 @@ MainComponent::MainComponent (bool isHeadless)
     header.onShuffle = [this] { setShuffle (! shuffle); };
     header.onTimeClicked = [this] { showRemaining = ! showRemaining; saveSettings(); };
     header.onOpen = [this] { showOpenDialog(); };
+    header.setVolumeMaximum (AudioEngine::maxVolume);
     header.onVolumeChanged = [this] (float v) { engine.setVolume (v); saveSettings(); };
     header.onQuickAction = [this] (int i, QuickAction a) { runQuickAction (i, a); };
     header.onQuickRightClick = [this] (int i) { showQuickMenu (i); };
@@ -239,6 +253,7 @@ MainComponent::MainComponent (bool isHeadless)
         setUiScale ((float) settings->getDoubleValue ("uiScale", 1.0));
         taskbarPlayer = settings->getBoolValue ("taskbarPlayer", true);
         smoothAnimations = settings->getBoolValue ("smoothAnimations", true);
+        setTheme (juce::jlimit (0, 2, settings->getIntValue ("theme", 0)));
         repeatMode = juce::jlimit (0, 2, settings->getIntValue ("repeat", 0));
         header.setRepeat (repeatMode);
         shuffle = settings->getBoolValue ("shuffle", false);
@@ -322,7 +337,7 @@ bool MainComponent::openFile (const juce::File& file, bool autoplay)
     const auto& d = engine.details();
 
     juce::StringArray meta;
-    const auto dot = utf8 ("  \xc2\xb7  ");
+    const juce::String dot ("\t");   // HeaderView sets the items apart (and drops some when narrow)
     auto kHz = [] (double sr) { return juce::String (sr / 1000.0, std::fmod (sr, 1000.0) != 0.0 ? 1 : 0) + " kHz"; };
     juce::String line;
     if (videoLoaded)
@@ -462,7 +477,7 @@ void MainComponent::updateVideoLayout()
     videoView.setTransform (juce::AffineTransform::scale (scale, scale, (float) area.getCentreX(), (float) area.getCentreY()));
     videoView.setVisible (m > 0.001f && area.getHeight() > 30);
     slotGrid.setAlpha (1.0f - m);
-    slotGrid.setVisible (m < 0.999f && area.getHeight() > 30);
+    slotGrid.setVisible (m < 0.999f && area.getHeight() > 30 && ! compact);
 }
 
 void MainComponent::onVBlank (double ts)
@@ -470,9 +485,9 @@ void MainComponent::onVBlank (double ts)
     const float dt = lastTimestamp > 0.0 ? (float) juce::jlimit (0.0, 0.1, ts - lastTimestamp) : 1.0f / 60.0f;
     lastTimestamp = ts;
 
-    // every other frame at 30 fps: when chosen, or while Transport is in the background
-    // (the meters stay readable, and drawing, the expensive part, halves)
-    if (! smoothAnimations || ! juce::Process::isForegroundProcess())
+    // every other frame at 30 fps when chosen (drawing, the expensive part, halves); in the
+    // background it keeps the same rate, so meters and plugins stay smooth next to other apps
+    if (! smoothAnimations)
     {
         oddFrame = ! oddFrame;
         if (oddFrame) { heldDt += dt; return; }
@@ -575,7 +590,11 @@ void MainComponent::tickFrame (float dt)
         windowHeight.tick (dt, 12.0f);
         if (auto* top = getTopLevelComponent())
             top->setSize (top->getWidth(), juce::roundToInt (windowHeight.current) + (top->getHeight() - getHeight()));
-        if (! windowHeight.moving()) animatingHeight = false;
+        if (! windowHeight.moving())
+        {
+            animatingHeight = false;
+            lockCompactHeight();
+        }
     }
 }
 
@@ -587,14 +606,6 @@ void MainComponent::paint (juce::Graphics& g)
 
 void MainComponent::paintOverChildren (juce::Graphics& g)
 {
-    // hairlines frame the header and the waveform
-    if (header.isVisible())
-    {
-        g.setColour (theme::hairline);
-        g.fillRect (0, header.getY(), getWidth(), 1);
-        g.fillRect (0, header.getBottom() - 1, getWidth(), 1);
-        g.fillRect (0, waveform.getBottom() - 1, getWidth(), 1);
-    }
     if (dropGlow.current > 0.01f)
     {
         g.setColour (theme::accent.withAlpha (0.08f * dropGlow.current));
@@ -630,7 +641,8 @@ MainComponent::Heights MainComponent::effectiveHeights() const
     // the plugin area keeps at least ~45 % of the window: header and waveform give way first
     const int available = getHeight() - kTitleH;
     int h = headerHeight, w = waveHeight;
-    const int reserve = compact ? 0 : juce::jmax (kMinPlugins, (int) (available * 0.45f));
+    // (not while the window grows back out of compact: the plugins open up below a steady header)
+    const int reserve = compact || animatingHeight ? 0 : juce::jmax (kMinPlugins, (int) (available * 0.45f));
     int excess = h + w + reserve - available;
     if (excess > 0) { const int cut = juce::jmin (excess, h - HeaderView::kMinHeight); h -= cut; excess -= cut; }
     if (excess > 0) { const int cut = juce::jmin (excess, w - kMinWave); w -= cut; }
@@ -650,6 +662,8 @@ void MainComponent::resized()
     splitWave->setBounds (0, waveform.getBottom() - 2, getWidth(), 10);
     splitHeader->toFront (false);
     splitWave->toFront (false);
+    hairlines.setBounds (getLocalBounds());
+    hairlines.toFront (false);
     browser.setBounds (getLocalBounds().withTrimmedTop (kTitleH));
     browser.toFront (false);
     const int promptW = juce::jmin (getWidth() - 24, 660);
@@ -687,7 +701,7 @@ bool MainComponent::keyPressed (const juce::KeyPress& k)
     if (k.getKeyCode() == juce::KeyPress::rewindKey)      { skip (-1); return true; }
     if (k == juce::KeyPress::leftKey)        { engine.setPosition (engine.getSmoothPosition() - (mods.isShiftDown() ? 30.0 : 5.0)); return true; }
     if (k == juce::KeyPress::rightKey)       { engine.setPosition (engine.getSmoothPosition() + (mods.isShiftDown() ? 30.0 : 5.0)); return true; }
-    if (k == juce::KeyPress::upKey)          { engine.setVolume (engine.getVolume() + 0.05f); header.setVolume (engine.getVolume()); return true; }
+    if (k == juce::KeyPress::upKey)          { const float v = engine.getVolume(); engine.setVolume (v < 1.0f ? juce::jmin (v + 0.05f, 1.0f) : v + 0.05f); header.setVolume (engine.getVolume()); return true; }   // stops at 0 dB once
     if (k == juce::KeyPress::downKey)        { engine.setVolume (engine.getVolume() - 0.05f); header.setVolume (engine.getVolume()); return true; }
     if (k == juce::KeyPress ('o', juce::ModifierKeys::commandModifier, 0)) { showOpenDialog(); return true; }
     if (k.getTextCharacter() == 'n')         { skip (1); return true; }
@@ -803,6 +817,10 @@ void MainComponent::showMainMenu()
     const char* scaleNames[] = { "Small", "Medium", "Large", "Extra large" };
     for (int i = 0; i < 4; ++i) sizes.addItem (400 + i, scaleNames[i], true, std::abs (uiScale - scales[i]) < 0.01f);
     m.addSubMenu ("Display size", sizes);
+    juce::PopupMenu themes;
+    const char* themeNames[] = { "Dark", "Ash", "Light" };
+    for (int i = 0; i < 3; ++i) themes.addItem (500 + i, themeNames[i], true, (int) theme::current() == i);
+    m.addSubMenu ("Theme", themes);
     m.addItem (3, "Reset layout");
     m.addSeparator();
     m.addItem (4, utf8 ("Audio output\xe2\x80\xa6"));
@@ -860,6 +878,7 @@ void MainComponent::showMainMenu()
             self.toast (self.taskbarPlayer ? "Hover the taskbar icon for the mini player" : "Taskbar mini player off");
             self.saveSettings();
         }
+        else if (r >= 500) { self.setTheme (r - 500); self.saveSettings(); }
         else if (r >= 400) { self.setUiScale (scales[r - 400]); self.saveSettings(); }
         else if (r >= 300) { self.waveform.setStyle ((WaveformView::Style) (r - 300)); self.saveSettings(); }
         else if (r > 200) { self.quickColumns = r - 200; self.quick.resize ((size_t) self.quickColumns * 2, QuickAction::open); self.applyQuickActions(); self.saveSettings(); }
@@ -981,6 +1000,17 @@ void MainComponent::setCustomizing (bool c)
     splitWave->shown.target = c ? 1.0f : 0.0f;
     if (c) toast (utf8 ("Drag slots to reorder \xc2\xb7 drag the orange handles to resize areas"));
     refreshQuickState();
+}
+
+void MainComponent::setTheme (int mode)
+{
+    theme::setCurrent ((theme::Mode) juce::jlimit (0, 2, mode));
+    theme::applyToLookAndFeel (juce::LookAndFeel::getDefaultLookAndFeel());
+    if (auto* window = dynamic_cast<juce::ResizableWindow*> (getTopLevelComponent()))
+        window->setBackgroundColour (theme::map (theme::background));
+    for (int i = juce::Desktop::getInstance().getNumComponents(); --i >= 0;)
+        juce::Desktop::getInstance().getComponent (i)->repaint();
+    repaint();
 }
 
 void MainComponent::setUiScale (float s)
@@ -1165,9 +1195,36 @@ void MainComponent::setCompact (bool c)
     compact = c;
     if (compact) expandedHeight = getHeight();
     windowHeight.snap ((float) getHeight());
-    windowHeight.target = (float) (compact ? kTitleH + effectiveHeights().header + effectiveHeights().wave : juce::jmax (360, expandedHeight));
+    windowHeight.target = (float) (compact ? compactHeight() : juce::jmax (360, expandedHeight));
+    // compact is just the header and the waveform: the plugins go at once (not row by row as the
+    // window shrinks), and the window may go below its usual minimum height, so nothing is left over
+    // for a plugin row when the animation ends
+    if (auto* rw = dynamic_cast<juce::ResizableWindow*> (top))
+    {
+        const int border = top->getHeight() - getHeight();
+        if (auto* lim = rw->getConstrainer())
+            rw->setResizeLimits (lim->getMinimumWidth(), compact ? compactHeight() + border : 240, lim->getMaximumWidth(), 16000);
+    }
     animatingHeight = true;
+    resized();
     refreshQuickState();
+}
+
+int MainComponent::compactHeight() const
+{
+    return kTitleH + juce::jlimit (HeaderView::kMinHeight, HeaderView::kMaxHeight, headerHeight) + juce::jlimit (kMinWave, kMaxWave, waveHeight);
+}
+
+void MainComponent::lockCompactHeight()
+{
+    // in compact the height follows the header and the waveform, it can't be dragged
+    auto* rw = dynamic_cast<juce::ResizableWindow*> (getTopLevelComponent());
+    if (! compact || rw == nullptr) return;
+    const int border = rw->getHeight() - getHeight();
+    const int h = compactHeight() + border;
+    if (auto* lim = rw->getConstrainer())
+        rw->setResizeLimits (lim->getMinimumWidth(), h, lim->getMaximumWidth(), h);
+    if (rw->getHeight() != h) rw->setSize (rw->getWidth(), h);
 }
 
 juce::Image MainComponent::renderMiniPlayer (int width, int height)
@@ -1240,7 +1297,7 @@ void MainComponent::askToBecomeDefault()
 
 void MainComponent::saveSnapshot()
 {
-    auto img = createComponentSnapshot (getLocalBounds(), true, 2.0f);
+    auto img = theme::snapshot (*this, 2.0f);
     auto dir = juce::File::getSpecialLocation (juce::File::userDesktopDirectory);
     auto file = dir.getNonexistentChildFile ("Transport " + juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H.%M.%S"), ".png");
     juce::PNGImageFormat png;
@@ -1283,6 +1340,7 @@ void MainComponent::saveSettings()
     s->setValue ("uiScale", (double) uiScale);
     s->setValue ("taskbarPlayer", taskbarPlayer);
     s->setValue ("smoothAnimations", smoothAnimations);
+    s->setValue ("theme", (int) theme::current());
     s->setValue ("repeat", repeatMode);
     s->setValue ("shuffle", shuffle);
     s->setValue ("showRemaining", showRemaining);

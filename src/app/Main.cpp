@@ -4,6 +4,7 @@
 #include "TaskbarPlayer.h"
 #include "MediaControls.h"
 #include "DocIcon.h"
+#include "ThemeRender.h"
 
 namespace tp
 {
@@ -13,20 +14,7 @@ class TransportLookAndFeel final : public juce::LookAndFeel_V4
 public:
     TransportLookAndFeel() : juce::LookAndFeel_V4 (getDarkColourScheme())
     {
-        using juce::Colour;
-        setColour (juce::PopupMenu::backgroundColourId, Colour (0xff19191c));
-        setColour (juce::PopupMenu::highlightedBackgroundColourId, Colour (0xff1c1c1e));
-        setColour (juce::PopupMenu::textColourId, juce::Colours::white);
-        setColour (juce::PopupMenu::highlightedTextColourId, juce::Colours::white);
-        setColour (juce::PopupMenu::headerTextColourId, theme::accent);
-        setColour (juce::TooltipWindow::backgroundColourId, Colour (0xff121215));
-        setColour (juce::TooltipWindow::textColourId, juce::Colours::white);
-        setColour (juce::TooltipWindow::outlineColourId, Colour (0xff28282b));
-        setColour (juce::ResizableWindow::backgroundColourId, theme::dialog);
-        setColour (juce::AlertWindow::backgroundColourId, theme::dialog);
-        setColour (juce::TextButton::buttonColourId, theme::button);
-        setColour (juce::ComboBox::backgroundColourId, theme::field);
-        setColour (juce::ComboBox::outlineColourId, Colour (0xff28282b));
+        theme::applyToLookAndFeel (*this);
 
        #if JUCE_WINDOWS
         setDefaultSansSerifTypefaceName ("Segoe UI");
@@ -39,7 +27,7 @@ public:
     void drawPopupMenuBackground (juce::Graphics& g, int w, int h) override
     {
         g.fillAll (findColour (juce::PopupMenu::backgroundColourId));
-        g.setColour (juce::Colour (0xff1c1c1e));
+        g.setColour (theme::map (juce::Colour (0xff2a2a2e)));
         g.drawRect (0, 0, w, h);
     }
 };
@@ -59,6 +47,7 @@ public:
         content->onMinimise = [this] { setMinimised (true); };
         content->onMaximise = [this] { setFullScreen (! isFullScreen()); };
         setContentOwned (content, true);
+        setBackgroundColour (theme::map (theme::background));
 
         setResizable (true, false);
         setResizeLimits (640, 240, 16000, 16000);
@@ -96,6 +85,12 @@ public:
     {
         media.reset();
         taskbar.reset();
+        if (content->isCompact())
+        {
+            // the next start is not compact: remember the window at its full height
+            setResizeLimits (640, 240, 16000, 16000);
+            setSize (getWidth(), content->heightOutsideCompact() + getHeight() - content->getHeight());
+        }
         storeWindowState (getWindowStateAsString());
     }
 
@@ -234,6 +229,8 @@ int runSnapshot (const juce::StringArray& args)
 
     const juce::File out = juce::File::getCurrentWorkingDirectory().getChildFile (value ("--snapshot", "snapshot.png"));
     const auto size = juce::StringArray::fromTokens (value ("--size", "1400x560"), "x", "");
+    const auto themeName = value ("--theme", "dark");
+    theme::setCurrent (themeName == "light" ? theme::Mode::light : (themeName == "ash" ? theme::Mode::ash : theme::Mode::dark));
     const int w = size[0].getIntValue(), h = size[1].getIntValue();
 
     auto main = std::make_unique<MainComponent> (true);
@@ -297,7 +294,7 @@ int runSnapshot (const juce::StringArray& args)
             main->getEngine().renderOffline (735);
             main->tickFrame (1.0f / 60.0f);
             const auto t1 = juce::Time::getMillisecondCounterHiRes();
-            juce::ignoreUnused (main->createComponentSnapshot (main->getLocalBounds(), true, 1.0f));
+            juce::ignoreUnused (theme::snapshot (*main, 1.0f));
             const auto t2 = juce::Time::getMillisecondCounterHiRes();
             tickMs += t1 - t0;
             paintMs += t2 - t1;
@@ -308,7 +305,7 @@ int runSnapshot (const juce::StringArray& args)
     if (main->hasVideo() && ! main->syncVideoNow (8000))
         std::printf ("video frame not ready\n");
 
-    auto img = main->createComponentSnapshot (main->getLocalBounds(), true, 1.0f);
+    auto img = theme::snapshot (*main, 1.0f);
     out.deleteFile();
     juce::FileOutputStream stream (out);
     juce::PNGImageFormat png;

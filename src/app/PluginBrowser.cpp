@@ -198,7 +198,9 @@ void PluginBrowser::paint (juce::Graphics& g)
         const int idx = cards[k];
         const auto& info = reg[(size_t) idx];
         const float h = cardHover[(size_t) idx].current;
-        const float stagger = juce::jlimit (0.0f, 1.0f, ct * 1.5f - (float) k * 0.06f);
+        // cards come in one after another, but the delay stops growing after a few, so every card
+        // ends fully opaque however long the list is
+        const float stagger = juce::jlimit (0.0f, 1.0f, ct * 1.5f - (float) juce::jmin ((int) k, 8) * 0.06f);
         auto r = cardArea ((int) k).translated (0.0f, 10.0f * (1.0f - stagger) - 2.0f * h);
         if (! r.intersects (view.expanded (4))) continue;
 
@@ -237,15 +239,6 @@ void PluginBrowser::paint (juce::Graphics& g)
         g.endTransparencyLayer();
     }
     g.restoreState();
-
-    // scroll hint
-    const float maxScroll = juce::jmax (0.0f, contentHeight() - view.getHeight());
-    if (maxScroll > 0.0f && scroll.current < maxScroll - 2.0f)
-    {
-        juce::ColourGradient fade (theme::dialog.withAlpha (0.0f), 0, view.getBottom() - 30, theme::dialog, 0, view.getBottom() + kPad, false);
-        g.setGradientFill (fade);
-        g.fillRect (view.withTop (view.getBottom() - 30).withBottom (view.getBottom() + kPad));
-    }
 
     g.endTransparencyLayer();
 }
