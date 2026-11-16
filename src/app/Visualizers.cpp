@@ -50,10 +50,29 @@ juce::String formatDb (float v, int decimals = 1)
     return (v > 0.05f ? "+" : "") + juce::String (v, decimals);
 }
 
+/** The font shrunk (down to `minScale` of its size) until `t` fits in `width`. */
+juce::Font fitFont (juce::Font f, const juce::String& t, float width, float minScale = 0.6f)
+{
+    const float w = juce::GlyphArrangement::getStringWidth (f, t);
+    if (w > width && w > 0.0f)
+        f = f.withHeight (f.getHeight() * juce::jmax (minScale, width / w * 0.98f));
+    return f;
+}
+
+/** Labels shrink to fit their box (to 70 %, never under 7 px) before they are shortened with an ellipsis. */
 void drawLabel (juce::Graphics& g, const juce::String& t, Rectangle<float> r, juce::Justification j = juce::Justification::centredLeft, Colour c = theme::label, float px = 10.0f)
 {
     g.setColour (c);
-    g.setFont (theme::font (px));
+    auto f = theme::font (px);
+    const float minScale = juce::jmax (0.7f, 7.0f * 1.33f / f.getHeight());
+    g.setFont (fitFont (f, t, r.getWidth(), juce::jmin (1.0f, minScale)));
+    g.drawText (t, r, j, true);
+}
+
+/** A measured value: shrinks as far as needed and is never cut, because a cut number is a wrong number. */
+void drawValue (juce::Graphics& g, const juce::String& t, Rectangle<float> r, juce::Font f, juce::Justification j = juce::Justification::centredLeft)
+{
+    g.setFont (fitFont (f, t, r.getWidth(), 0.05f));
     g.drawText (t, r, j, false);
 }
 
@@ -277,7 +296,7 @@ public:
             g.drawText (txt, Rectangle<float> (x - 20, 268, 40, 14), juce::Justification::centred, false);
 
         g.restoreState();
-        drawLabel (g, "POLAR STEREO FIELD  dBFS", getLocalBounds().toFloat().reduced (12, 8).removeFromTop (14), juce::Justification::centredLeft, theme::label, 10.0f);
+        drawLabel (g, getWidth() < 200 ? "POLAR  dBFS" : "POLAR STEREO FIELD  dBFS", getLocalBounds().toFloat().reduced (12, 8).removeFromTop (14), juce::Justification::centredLeft, theme::label, 10.0f);
     }
 
 private:
@@ -333,8 +352,12 @@ public:
         if (area.getHeight() > 90.0f)
         {
             auto head = area.removeFromTop (14);
+            // the peak readout only where it fits beside the title (it goes first, the title stays)
+            const float titleW = juce::GlyphArrangement::getStringWidth (theme::font (10.0f), "SPECTRUM  dB / Hz");
+            const float peakW = juce::GlyphArrangement::getStringWidth (theme::font (10.0f), peakText);
             drawLabel (g, "SPECTRUM  dB / Hz", head, juce::Justification::centredLeft, theme::label, 10.0f);
-            drawLabel (g, peakText, head, juce::Justification::centredRight, Colour (0xffd8d8d8), 10.0f);
+            if (titleW + peakW + 16.0f <= head.getWidth())
+                drawLabel (g, peakText, head, juce::Justification::centredRight, Colour (0xffd8d8d8), 10.0f);
             area.removeFromTop (4);
         }
         auto scaleCol = area.removeFromLeft (28);
@@ -441,7 +464,7 @@ public:
         if (area.getHeight() < 130.0f) { paintCompact (g, area); return; }
 
         auto head = area.removeFromTop (16);
-        drawLabel (g, "LOUDNESS", head, juce::Justification::centredLeft, theme::label, 10.0f);
+        drawLabel (g, "LOUDNESS  LUFS", head, juce::Justification::centredLeft, theme::label, 10.0f);
         paintTargetChip (g, head);
         area.removeFromTop (8);
 
@@ -472,6 +495,12 @@ private:
         const auto txt = juce::String (kTargets[target].name) + "  " + juce::String (kTargets[target].lufs, 0) + " LUFS";
         g.setFont (theme::font (9.5f, true));
         const float w = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), txt) + 16.0f;
+        // no room beside the title: leave the chip out rather than cover the title
+        if (w + juce::GlyphArrangement::getStringWidth (theme::font (10.0f), "LOUDNESS  LUFS") + 12.0f > row.getWidth())
+        {
+            targetChip = {};
+            return;
+        }
         targetChip = Rectangle<float> (w, 16.0f).withPosition (row.getRight() - w, row.getY());
         g.setColour (Colour (0xff474747));
         g.fillRoundedRectangle (targetChip, 8.0f);
@@ -584,13 +613,12 @@ private:
         }
 
         auto top = area.removeFromTop (16);
-        drawLabel (g, "LUFS integrated", top, juce::Justification::centredLeft, Colour (0xffcfcfcf), 10.0f);
+        drawLabel (g, "LOUDNESS  LUFS", top, juce::Justification::centredLeft, theme::label, 10.0f);
         paintTargetChip (g, top);
         drawLabel (g, "M " + formatDb (momentary) + "   S " + formatDb (shortTerm) + "   LRA " + juce::String (range, 1),
                    area.removeFromBottom (14), juce::Justification::centredLeft, Colour (0xffcfcfcf), 10.0f);
         g.setColour (theme::text);
-        g.setFont (theme::mono (juce::jlimit (14.0f, 30.0f, area.getHeight() * 0.7f)));
-        g.drawText (formatDb (integrated), area, juce::Justification::centredLeft, false);
+        drawValue (g, formatDb (integrated), area, theme::mono (juce::jlimit (14.0f, 30.0f, area.getHeight() * 0.7f)));
     }
 
     Smoothed momentaryBar, shortBar;
@@ -656,7 +684,7 @@ public:
         g.drawDashedLine ({ c.x + R * 0.5f, c.y - R * 0.5f, c.x - R * 0.5f, c.y + R * 0.5f }, dash, 2, 1.0f);
 
         g.drawImage (phosphor, area);
-        drawLabel (g, "GONIOMETER", getLocalBounds().toFloat().reduced (12, 8).removeFromTop (14), juce::Justification::centredLeft, theme::label, 10.0f);
+        drawLabel (g, getWidth() < 120 ? "GONIO" : "GONIOMETER", getLocalBounds().toFloat().reduced (12, 8).removeFromTop (14), juce::Justification::centredLeft, theme::label, 10.0f);
 
         g.setColour (Colour (0xffd8d8d8));
         g.setFont (theme::font (10));
@@ -699,12 +727,12 @@ public:
     void paint (juce::Graphics& g) override
     {
         auto area = getLocalBounds().toFloat().reduced (14, 12);
-        drawLabel (g, utf8 ("PHASE CORRELATION  \xc2\xb7  BALANCE"), area.removeFromTop (14));
+        drawLabel (g, getWidth() < 260 ? utf8 ("PHASE  \xc2\xb7  BALANCE") : utf8 ("PHASE CORRELATION  \xc2\xb7  BALANCE"), area.removeFromTop (14));
         area.removeFromTop (6);
 
         g.setColour (shown < 0.0f ? theme::accent : theme::text);
         g.setFont (theme::mono (juce::jlimit (20.0f, 42.0f, area.getHeight() * 0.28f)));
-        g.drawText ((shown >= 0.0f ? "+" : "") + juce::String (shown, 2), area.removeFromTop (juce::jlimit (28.0f, 56.0f, area.getHeight() * 0.36f)), juce::Justification::centredLeft, false);
+        drawValue (g, (shown >= 0.0f ? "+" : "") + juce::String (shown, 2), area.removeFromTop (juce::jlimit (28.0f, 56.0f, area.getHeight() * 0.36f)), g.getCurrentFont());
 
         auto drawBar = [&] (Rectangle<float> r, float pos01, bool fillFromCentre, const juce::String& a, const juce::String& b, const juce::String& c)
         {
@@ -900,17 +928,20 @@ public:
     void paint (juce::Graphics& g) override
     {
         auto area = getLocalBounds().toFloat().reduced (14, 12);
-        drawLabel (g, utf8 ("PEAK  \xc2\xb7  RMS  dBFS"), area.removeFromTop (14));
+        drawLabel (g, getWidth() < 150 ? juce::String ("PEAK  RMS") : utf8 ("PEAK  \xc2\xb7  RMS  dBFS"), area.removeFromTop (14));
         area.removeFromTop (8);
         auto readout = area.removeFromBottom (18);
 
         auto scaleCol = area.removeFromRight (30);
         g.setFont (theme::font (9.5f));
+        float lastLabelY = -100.0f;
         for (int db : { 0, -6, -12, -18, -24, -36, -48 })
         {
             const float y = area.getBottom() - area.getHeight() * norm ((float) db);
             g.setColour (Colour (0xff6a6a6a));
             g.drawHorizontalLine ((int) y, area.getX(), area.getRight());
+            if (y - lastLabelY < 13.0f) continue;   // too close to the one above: line only
+            lastLabelY = y;
             g.setColour (Colour (0xffcfcfcf));
             g.drawText (juce::String (db), scaleCol.withY (y - 7).withHeight (14), juce::Justification::centredRight, false);
         }
@@ -934,8 +965,8 @@ public:
             g.fillRect (Rectangle<float> (bar.getX(), bar.getBottom() - bar.getHeight() * m.hold - 1.0f, barW, 2.0f));
 
             g.setColour (theme::text);
-            g.setFont (theme::mono (11));
-            g.drawText ((c == 0 ? "L " : "R ") + formatDb (m.hold * 63.0f - 60.0f, 1), Rectangle<float> (bar.getX() - 6, readout.getY(), barW + 12, readout.getHeight()), juce::Justification::centred, false);
+            drawValue (g, (c == 0 ? "L " : "R ") + formatDb (m.hold * 63.0f - 60.0f, 1), Rectangle<float> (bar.getX() - 4, readout.getY(), barW + 8, readout.getHeight()),
+                       theme::mono (11), juce::Justification::centred);
         }
     }
 
@@ -1005,6 +1036,10 @@ juce::String formatDb (float v, int decimals)               { return tp::formatD
 void drawLabel (juce::Graphics& g, const juce::String& t, juce::Rectangle<float> r, juce::Justification j, juce::Colour c, float px)
 {
     tp::drawLabel (g, t, r, j, c, px);
+}
+void drawValue (juce::Graphics& g, const juce::String& t, juce::Rectangle<float> r, juce::Font f, juce::Justification j)
+{
+    tp::drawValue (g, t, r, f, j);
 }
 }
 

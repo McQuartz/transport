@@ -18,8 +18,13 @@ Grab the newest **vX.Y.Z** release from the Releases page (a rolling *developmen
   - macOS (AVFoundation): MP4, MOV, M4V, 3GP
   - Linux (FFmpeg): all of the above plus WebM, FLV, MPEG, TS, OGV
   - Codecs are whatever the system decodes: H.264 everywhere; HEVC, VP9, AV1 depend on OS version and installed extensions.
-- Click or drag on the waveform to seek. **Space** plays/pauses, **← →** seek 5 s (Shift: 30 s), **↑ ↓** volume, **N / P** next/previous track in the folder, **R** repeat (off → all → this track), **M** mono, **L** A–B loop.
+- Click or drag on the waveform to seek. **Space** plays/pauses, **← →** seek 5 s (Shift: 30 s), **↑ ↓** volume, **N / P** next/previous track in the folder, **R** repeat (off → all → this track), **S** shuffle, media keys, **M** mono, **L** A–B loop.
 - **Repeat:** the ↻ button next to ⏭ cycles off → repeat all (wraps round the folder) → repeat this track (shows a 1).
+- **Shuffle:** the ⤨ button left of ⏮ (or **S**) plays the folder in random order; ⏮ goes back through what you heard.
+- Click the time under the title to switch between elapsed and remaining. Transport resumes the last track where you stopped.
+- Drop several files or a folder to make them the playlist. Opening a file while Transport runs brings its window to the front.
+- **Media keys and system overlay:** play/pause/next/previous keys work; Windows shows the track in its media overlay, macOS in Control Center (Now Playing).
+- **Smooth animations:** MENU → Smooth animations (60 fps). Off: 30 fps. In the background Transport always runs at 30 fps and pauses analysis while minimised.
 - **Customize layout** (MENU or the grid quick-access button): drag slots to reorder, set each slot to narrow/normal/wide/extra wide, add or replace plugins, and drag the orange handles to set the height of the header and waveform. The plugins pack themselves into rows that always fill the space. **Done** or Esc leaves the mode.
 - **Maximize a plugin:** double-click it (or the ⤢ button on hover) to fill the whole plugin area; Esc restores.
 - **Quick-access buttons** (top right): left-click runs, right-click assigns another function or changes the grid size (2×2, 3×2, 4×2). A short header shows one row.

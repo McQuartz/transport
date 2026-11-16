@@ -27,10 +27,12 @@ public:
     std::function<NowPlaying()> state;   // polled twice a second
 
     struct Impl;
+    struct ImplDeleter { void operator() (Impl*) const; };   // defined where Impl is complete
+    using ImplPtr = std::unique_ptr<Impl, ImplDeleter>;
 
 private:
     void timerCallback() override;
-    std::unique_ptr<Impl> impl;
+    ImplPtr impl;
     juce::String lastKey;
     double lastPosition = -10.0;
 };
@@ -38,8 +40,8 @@ private:
 namespace mediacontrols
 {
 /** The platform part; implemented in MediaControlsWindows.cpp / MediaControlsMac.mm / MediaControls.cpp. */
-std::unique_ptr<MediaControls::Impl> create (juce::Component& window, MediaControls& owner);
+MediaControls::ImplPtr create (juce::Component& window, MediaControls& owner);
 void update (MediaControls::Impl&, const NowPlaying&, bool trackChanged);
-void destroy (std::unique_ptr<MediaControls::Impl>&);
+void destroy (MediaControls::ImplPtr&);
 }
 } // namespace tp

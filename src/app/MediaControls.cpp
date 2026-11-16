@@ -30,11 +30,12 @@ void MediaControls::timerCallback()
 
 #if ! JUCE_WINDOWS && ! JUCE_MAC
 struct MediaControls::Impl {};
+void MediaControls::ImplDeleter::operator() (Impl* p) const { delete p; }
 namespace mediacontrols
 {
-std::unique_ptr<MediaControls::Impl> create (juce::Component&, MediaControls&) { return nullptr; }
+MediaControls::ImplPtr create (juce::Component&, MediaControls&) { return nullptr; }
 void update (MediaControls::Impl&, const NowPlaying&, bool) {}
-void destroy (std::unique_ptr<MediaControls::Impl>& p) { p.reset(); }
+void destroy (MediaControls::ImplPtr& p) { p.reset(); }
 }
 #endif
 } // namespace tp

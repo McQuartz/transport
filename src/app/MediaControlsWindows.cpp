@@ -30,17 +30,18 @@ struct MediaControls::Impl
     juce::File coverFile;
     int coverCounter = 0;
 };
+void MediaControls::ImplDeleter::operator() (Impl* p) const { delete p; }
 
 namespace mediacontrols
 {
-std::unique_ptr<MediaControls::Impl> create (juce::Component& window, MediaControls& owner)
+MediaControls::ImplPtr create (juce::Component& window, MediaControls& owner)
 {
     try
     {
         auto hwnd = (HWND) window.getWindowHandle();
         if (hwnd == nullptr) return nullptr;
         auto interop = winrt::get_activation_factory<SystemMediaTransportControls, ISystemMediaTransportControlsInterop>();
-        auto impl = std::make_unique<MediaControls::Impl>();
+        auto impl = MediaControls::ImplPtr (new MediaControls::Impl());
         winrt::check_hresult (interop->GetForWindow (hwnd, winrt::guid_of<SystemMediaTransportControls>(), winrt::put_abi (impl->smtc)));
         auto& s = impl->smtc;
         s.IsEnabled (true);
@@ -131,7 +132,7 @@ void update (MediaControls::Impl& impl, const NowPlaying& np, bool trackChanged)
     catch (...) {}
 }
 
-void destroy (std::unique_ptr<MediaControls::Impl>& impl)
+void destroy (MediaControls::ImplPtr& impl)
 {
     if (impl == nullptr) return;
     try
@@ -147,11 +148,12 @@ void destroy (std::unique_ptr<MediaControls::Impl>& impl)
 #else   // Windows SDK without C++/WinRT: no overlay
 
 struct MediaControls::Impl {};
+void MediaControls::ImplDeleter::operator() (Impl* p) const { delete p; }
 namespace mediacontrols
 {
-std::unique_ptr<MediaControls::Impl> create (juce::Component&, MediaControls&) { return nullptr; }
+MediaControls::ImplPtr create (juce::Component&, MediaControls&) { return nullptr; }
 void update (MediaControls::Impl&, const NowPlaying&, bool) {}
-void destroy (std::unique_ptr<MediaControls::Impl>& p) { p.reset(); }
+void destroy (MediaControls::ImplPtr& p) { p.reset(); }
 }
 #endif
 } // namespace tp

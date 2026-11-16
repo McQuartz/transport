@@ -10,14 +10,15 @@ struct MediaControls::Impl
     MediaControls* owner = nullptr;
     NSMutableArray* targets = nil;   // (command, target) pairs to remove again
 };
+void MediaControls::ImplDeleter::operator() (Impl* p) const { delete p; }
 
 namespace mediacontrols
 {
-std::unique_ptr<MediaControls::Impl> create (juce::Component&, MediaControls& owner)
+MediaControls::ImplPtr create (juce::Component&, MediaControls& owner)
 {
     if (@available (macOS 10.12.2, *))
     {
-        auto impl = std::make_unique<MediaControls::Impl>();
+        auto impl = MediaControls::ImplPtr (new MediaControls::Impl());
         impl->owner = &owner;
         impl->targets = [NSMutableArray array];
         MPRemoteCommandCenter* cc = [MPRemoteCommandCenter sharedCommandCenter];
@@ -72,7 +73,7 @@ void update (MediaControls::Impl&, const NowPlaying& np, bool trackChanged)
     }
 }
 
-void destroy (std::unique_ptr<MediaControls::Impl>& impl)
+void destroy (MediaControls::ImplPtr& impl)
 {
     if (impl == nullptr) return;
     for (NSArray* pair in impl->targets)

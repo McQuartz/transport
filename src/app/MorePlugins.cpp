@@ -9,6 +9,7 @@ using juce::Colour;
 using juce::Rectangle;
 using juce::Point;
 using plug::drawLabel;
+using plug::drawValue;
 using plug::formatDb;
 
 constexpr float kPi = juce::MathConstants<float>::pi;
@@ -134,8 +135,12 @@ public:
         auto badge = top.removeFromRight (56).withSizeKeepingCentre (52, 30);
         const float t = easeOutCubic (fade.current);
         g.setColour (theme::text.withAlpha (t));
-        g.setFont (theme::font (juce::jlimit (16.0f, 26.0f, top.getHeight() * 0.55f), true));
-        g.drawText (juce::String (KeyDetector::keyName (key)), top.translated (0, 6.0f * (1.0f - t)), juce::Justification::centredLeft, true);
+        // narrow: "F" + the badge instead of a cut "F ..."
+        juce::String keyText (KeyDetector::keyName (key));
+        const auto keyFont = theme::font (juce::jlimit (16.0f, 26.0f, top.getHeight() * 0.55f), true);
+        if (juce::GlyphArrangement::getStringWidth (keyFont, keyText) > top.getWidth() - 4.0f && key >= 0)
+            keyText = keyText.upToFirstOccurrenceOf (" ", false, false) + (key >= 12 ? "m" : "");
+        drawValue (g, keyText, top.translated (0, 6.0f * (1.0f - t)), keyFont);
         g.setColour (Colour (0xff3a3a3a));
         g.fillRoundedRectangle (badge, 4.0f);
         g.setColour (theme::accent.withAlpha (t));
@@ -169,8 +174,9 @@ public:
             const float h = col.getHeight() * juce::jlimit (0.0f, 1.0f, bars[i].current);
             g.setColour (i == tonic ? theme::accent : (inScale (i) ? Colour (0xffe8e8e8) : Colour (0xff8a8a8a)));
             g.fillRect (col.withTop (col.getBottom() - h));
-            drawLabel (g, kNoteNames[i], Rectangle<float> (col.getX() - 4, labels.getY(), col.getWidth() + 8, 12), juce::Justification::centred,
-                       inScale (i) ? theme::text : Colour (0xffb8b8b8), 9.0f);
+            if (w >= 13.0f)   // note names only where they fit side by side
+                drawLabel (g, kNoteNames[i], Rectangle<float> (col.getX() - 2, labels.getY(), col.getWidth() + 4, 12), juce::Justification::centred,
+                           inScale (i) ? theme::text : Colour (0xffb8b8b8), 9.0f);
         }
     }
 
@@ -205,7 +211,7 @@ public:
         auto r = getLocalBounds().toFloat().reduced (14, 12);
         drawLabel (g, "TEMPO", r.removeFromTop (14));
 
-        auto ringArea = r.removeFromLeft (juce::jmin (r.getHeight(), r.getWidth() * 0.4f));
+        auto ringArea = r.removeFromLeft (juce::jmin (r.getHeight(), r.getWidth() * (r.getWidth() < 160.0f ? 0.3f : 0.4f)));
         const auto c = ringArea.getCentre();
         const float rad = juce::jmin (ringArea.getWidth(), ringArea.getHeight()) * 0.36f;
         g.setColour (theme::accent.withAlpha (0.18f * pulse.current));
@@ -223,9 +229,8 @@ public:
         r.removeFromLeft (12);
         auto big = r.removeFromTop (r.getHeight() * 0.6f);
         g.setColour (theme::text);
-        g.setFont (theme::mono (juce::jlimit (22.0f, 46.0f, big.getHeight() * 0.7f)));
         const auto txt = bpm > 0.0f ? juce::String (bpm, 1) : juce::String ("--");
-        g.drawText (txt, big, juce::Justification::bottomLeft, false);
+        drawValue (g, txt, big, theme::mono (juce::jlimit (22.0f, 46.0f, big.getHeight() * 0.7f)), juce::Justification::bottomLeft);
         drawLabel (g, "BPM", r.removeFromTop (14), juce::Justification::centredLeft, theme::label, 11.0f);
         if (bpm > 0.0f)
             drawLabel (g, utf8 ("\xc2\xbd ") + juce::String (bpm * 0.5f, 1) + utf8 ("  \xc2\xb7  2\xc3\x97 ") + juce::String (bpm * 2.0f, 1)
@@ -270,10 +275,16 @@ public:
         const char* verdict = c < 6.0f ? "Squashed" : (c < 9.0f ? "Dense" : (c < 13.0f ? "Punchy" : "Dynamic"));
         auto top = r.removeFromTop (juce::jmin (46.0f, r.getHeight() * 0.35f));
         g.setColour (theme::text);
-        g.setFont (theme::mono (juce::jlimit (18.0f, 32.0f, top.getHeight() * 0.75f)));
-        g.drawText (juce::String (c, 1) + " dB", top, juce::Justification::centredLeft, false);
-        drawLabel (g, verdict, top, juce::Justification::centredRight, c < 6.0f ? theme::accent : theme::text, 13.0f);
-        drawLabel (g, "crest factor (peak - RMS)", r.removeFromTop (14), juce::Justification::centredLeft, Colour (0xffcfcfcf), 9.5f);
+        const auto valueFont = theme::mono (juce::jlimit (18.0f, 32.0f, top.getHeight() * 0.75f));
+        const auto value = juce::String (c, 1) + " dB";
+        const float valueW = juce::GlyphArrangement::getStringWidth (valueFont, value);
+        const float verdictW = juce::GlyphArrangement::getStringWidth (theme::font (13.0f), verdict);
+        const bool sideBySide = valueW + verdictW + 12.0f <= top.getWidth();
+        drawValue (g, value, top, valueFont);
+        auto sub = r.removeFromTop (14);
+        if (sideBySide) drawLabel (g, verdict, top, juce::Justification::centredRight, c < 6.0f ? theme::accent : theme::text, 13.0f);
+        else            drawLabel (g, verdict, sub.removeFromRight (juce::jmin (sub.getWidth() * 0.45f, verdictW + 4.0f)), juce::Justification::centredRight, c < 6.0f ? theme::accent : theme::text, 11.0f);
+        drawLabel (g, sideBySide ? "crest factor (peak - RMS)" : "crest factor", sub, juce::Justification::centredLeft, Colour (0xffcfcfcf), 9.5f);
         r.removeFromTop (4);
 
         // scale with zones
@@ -346,9 +357,10 @@ public:
 
         auto big = r.removeFromTop (juce::jmin (48.0f, r.getHeight() * 0.38f));
         g.setColour (maxTp > -1.0f ? theme::accent : theme::text);
-        g.setFont (theme::mono (juce::jlimit (18.0f, 34.0f, big.getHeight() * 0.75f)));
-        g.drawText (formatDb (maxTp), big, juce::Justification::centredLeft, false);
-        drawLabel (g, "dBTP max", big, juce::Justification::centredRight, theme::label, 11.0f);
+        const bool roomy = big.getWidth() > 190.0f;
+        auto unit = big.removeFromRight (roomy ? 60.0f : 34.0f);
+        drawValue (g, formatDb (maxTp), big, theme::mono (juce::jlimit (18.0f, 34.0f, big.getHeight() * 0.75f)));
+        drawLabel (g, roomy ? "dBTP max" : "dBTP", unit, juce::Justification::centredRight, theme::label, 11.0f);
 
         auto bar = r.removeFromTop (12);
         g.setColour (Colour (0xff444444));
@@ -370,11 +382,11 @@ public:
         {
             drawLabel (g, name, c.removeFromTop (13), juce::Justification::centredLeft, Colour (0xffcfcfcf), 9.5f);
             g.setColour (count > 0 ? theme::accent : theme::text);
-            g.setFont (theme::mono (16.0f));
-            g.drawText (juce::String (count), c.removeFromTop (22), juce::Justification::centredLeft, false);
+            drawValue (g, juce::String (count), c.removeFromTop (22).withTrimmedRight (6), theme::mono (16.0f));
         };
-        cell (r.withWidth (colW), "Clipped samples", clipped);
-        cell (r.withTrimmedLeft (colW), "Inter-sample overs", overs);
+        const bool wide = colW > 110.0f;
+        cell (r.withWidth (colW), wide ? "Clipped samples" : "Clips", clipped);
+        cell (r.withTrimmedLeft (colW), wide ? "Inter-sample overs" : "ISP overs", overs);
     }
 
 private:
@@ -411,12 +423,16 @@ public:
         for (int i = AnalysisFrame::kWidthBands - 1; i >= 0; --i)
         {
             auto row = r.removeFromTop (rowH).reduced (0, juce::jmin (5.0f, rowH * 0.15f));
-            auto labelArea = row.removeFromLeft (64);
+            auto labelArea = row.removeFromLeft (r.getWidth() < 200.0f ? 40.0f : 64.0f);
             const int band = AnalysisFrame::kWidthBands - 1 - i;   // top row = air
-            drawLabel (g, names[band], labelArea.removeFromTop (labelArea.getHeight() * 0.55f), juce::Justification::bottomLeft, theme::text, 10.0f);
-            drawLabel (g, ranges[band], labelArea, juce::Justification::topLeft, Colour (0xffb8b8b8), 8.5f);
+            if (row.getHeight() >= 22.0f)   // name over range only when both lines fit
+            {
+                drawLabel (g, names[band], labelArea.removeFromTop (labelArea.getHeight() * 0.55f), juce::Justification::bottomLeft, theme::text, 10.0f);
+                drawLabel (g, ranges[band], labelArea, juce::Justification::topLeft, Colour (0xffb8b8b8), 8.5f);
+            }
+            else drawLabel (g, names[band], labelArea, juce::Justification::centredLeft, theme::text, 9.5f);
 
-            auto pct = row.removeFromRight (42);
+            auto pct = row.removeFromRight (r.getWidth() < 200.0f ? 32.0f : 42.0f);
             g.setColour (Colour (0xff4b4b4b));
             g.fillRect (row);
             g.setColour (Colour (0xff7a7a7a));
@@ -493,7 +509,9 @@ public:
             const float y = toY (v);
             g.setColour (outside ? theme::accent : juce::Colours::white);
             g.fillRoundedRectangle (Rectangle<float> (col.getX() - 4, y - 2.5f, col.getWidth() + 8, 5.0f), 2.5f);
-            drawLabel (g, names[b], Rectangle<float> (r.getX() + colW * (float) b, labels.getY(), colW, 14), juce::Justification::centred, theme::text, 9.5f);
+            static const char* shortNames[4] = { "LO", "LO-M", "HI-M", "HI" };
+            static const char* tinyNames[4]  = { "L", "LM", "HM", "H" };
+            drawLabel (g, colW < 34.0f ? tinyNames[b] : colW < 62.0f ? shortNames[b] : names[b], Rectangle<float> (r.getX() + colW * (float) b, labels.getY(), colW, 14), juce::Justification::centred, theme::text, 9.5f);
         }
     }
 
