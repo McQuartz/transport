@@ -2,6 +2,7 @@
 #include "media/Media.h"
 #include "VideoPlayer.h"
 #include "TaskbarPlayer.h"
+#include "DocIcon.h"
 
 namespace tp
 {
@@ -264,6 +265,8 @@ int runSnapshot (const juce::StringArray& args)
         main->openPluginBrowser();
     if (args.contains ("--fullscreen"))
         main->setFullscreenVideo (true);
+    if (args.contains ("--repeat"))
+        main->setRepeat (value ("--repeat", "1").getIntValue());
 
     const int frames = (int) (60.0 * value ("--seconds", "4").getDoubleValue());
     for (int i = 0; i < frames; ++i)
@@ -280,6 +283,41 @@ int runSnapshot (const juce::StringArray& args)
     juce::FileOutputStream stream (out);
     juce::PNGImageFormat png;
     const bool ok = stream.openedOk() && png.writeImageToStream (img, stream);
+    std::printf ("%s %s\n", ok ? "wrote" : "FAILED", out.getFullPathName().toRawUTF8());
+    return ok ? 0 : 1;
+}
+
+/** --doc-icons out.png: the file-type icons in every colour of the menu, big and small, for review. */
+int runDocIcons (const juce::StringArray& args)
+{
+    const int i = args.indexOf ("--doc-icons");
+    const auto out = juce::File::getCurrentWorkingDirectory().getChildFile (i + 1 < args.size() ? args[i + 1].unquoted() : "doc-icons.png");
+    const int cell = 150, rows = (int) std::size (docicon::swatches);
+    const int sizes[] = { 16, 24, 32, 48, 64 };
+    juce::Image sheet (juce::Image::ARGB, cell * 4 + 40 + 230 * 2, rows * cell, true);
+    juce::Graphics g (sheet);
+    for (int half = 0; half < 2; ++half)
+    {
+        const int x0 = half * (sheet.getWidth() / 2);
+        g.setColour (half == 0 ? juce::Colour (0xffececec) : juce::Colour (0xff1e1e1e));
+        g.fillRect (x0, 0, sheet.getWidth() / 2, sheet.getHeight());
+        for (int r = 0; r < rows; ++r)
+        {
+            const juce::Colour page (docicon::swatches[r].argb);
+            g.drawImageAt (docicon::render ("mp3", false, page, 128), x0 + 10, r * cell + 10);
+            g.drawImageAt (docicon::render ("mp4", true, page, 128), x0 + 10 + cell, r * cell + 10);
+            int x = x0 + 20 + cell * 2;
+            for (int s : sizes)
+            {
+                g.drawImageAt (docicon::render ("flac", false, page, s), x, r * cell + 74 - s / 2);
+                x += s + 10;
+            }
+        }
+    }
+    out.deleteFile();
+    juce::FileOutputStream stream (out);
+    juce::PNGImageFormat png;
+    const bool ok = stream.openedOk() && png.writeImageToStream (sheet, stream);
     std::printf ("%s %s\n", ok ? "wrote" : "FAILED", out.getFullPathName().toRawUTF8());
     return ok ? 0 : 1;
 }
@@ -430,6 +468,12 @@ public:
         if (args.contains ("--probe-media"))
         {
             setApplicationReturnValue (runProbe (args));
+            quit();
+            return;
+        }
+        if (args.contains ("--doc-icons"))
+        {
+            setApplicationReturnValue (runDocIcons (args));
             quit();
             return;
         }

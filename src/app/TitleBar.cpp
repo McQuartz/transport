@@ -1,4 +1,5 @@
 #include "TitleBar.h"
+#include "Logo.h"
 
 namespace tp
 {
@@ -71,10 +72,13 @@ void TitleBar::paint (juce::Graphics& g)
 
     const float cy = menu.getCentreY();
     const float lx = menu.getX() + 12.0f;
-    g.setColour (juce::Colour (0xff9a9a9a).interpolatedWith (juce::Colours::white, hover[0].current * 0.5f));
-    g.drawEllipse (juce::Rectangle<float> (13, 13).withCentre ({ lx + 6.5f, cy }), 1.3f);
-    g.drawEllipse (juce::Rectangle<float> (13, 13).withCentre ({ lx + 14.5f, cy }), 1.3f);
-    g.drawEllipse (juce::Rectangle<float> (6, 6).withCentre ({ lx + 10.5f, cy }), 1.3f);
+    {
+        // the logo mark; a little brighter on hover
+        const float hv = hover[0].current * 0.5f;
+        logo::paintMark (g, juce::Rectangle<float> (21.0f, 19.0f).withCentre ({ lx + 10.5f, cy }),
+                         logo::light.interpolatedWith (juce::Colours::white, hv),
+                         logo::grey.interpolatedWith (juce::Colour (0xff6a6a6a), hv));
+    }
     g.setColour (juce::Colour (0xffe6e6e6));
     g.setFont (theme::font (11.0f, true));
     g.drawText ("MENU", menu.withTrimmedLeft (36), juce::Justification::centredLeft, false);

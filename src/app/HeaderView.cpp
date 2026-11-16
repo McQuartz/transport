@@ -7,15 +7,16 @@ using juce::Rectangle;
 using juce::Point;
 
 //==============================================================================
-class HeaderView::IconButton final : public juce::Component, public Animated
+class HeaderView::IconButton final : public juce::Component, public juce::SettableTooltipClient, public Animated
 {
 public:
-    enum class Kind { prev, play, next };
+    enum class Kind { prev, play, next, repeat };
 
     explicit IconButton (Kind k) : kind (k) { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
 
     std::function<void()> onClick;
     void setPlaying (bool p) { morph.target = p ? 1.0f : 0.0f; }
+    void setRepeat (int m)   { repeatMode = m; morph.target = m > 0 ? 1.0f : 0.0f; repaint(); }
 
     void animate (float dt) override
     {
@@ -43,6 +44,27 @@ public:
         const auto c = b.getCentre();
         g.addTransform (juce::AffineTransform::translation (-boxW * 0.5f, -boxH * 0.5f).scaled (scale).translated (c.x, c.y));
 
+        if (kind == Kind::repeat)
+        {
+            // two arrows chasing each other round a loop; accent when on, a "1" inside for repeat one
+            const auto base = theme::icon.interpolatedWith (theme::iconBright, state.hover.current * 0.75f);
+            g.setColour (base.interpolatedWith (theme::accent, morph.current));
+            juce::Path loop;
+            loop.startNewSubPath (6, 19); loop.lineTo (6, 14); loop.quadraticTo (6, 9, 11, 9); loop.lineTo (24, 9);
+            loop.startNewSubPath (28, 15); loop.lineTo (28, 20); loop.quadraticTo (28, 25, 23, 25); loop.lineTo (10, 25);
+            g.strokePath (loop, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            juce::Path heads;
+            heads.addTriangle (23, 3.5f, 30, 9, 23, 14.5f);
+            heads.addTriangle (11, 19.5f, 4, 25, 11, 30.5f);
+            g.fillPath (heads);
+            if (repeatMode == 2)
+            {
+                g.setFont (theme::font (9.0f, true));
+                g.drawText ("1", juce::Rectangle<float> (11, 11, 12, 12), juce::Justification::centred, false);
+            }
+            return;
+        }
+
         g.setColour (theme::icon.interpolatedWith (theme::iconBright, juce::jmax (state.hover.current * 0.75f, kind == Kind::play ? morph.current * 0.7f : 0.0f)));
         juce::Path p;
         if (kind == Kind::prev)      { p.addRectangle (3, 5, 4, 24); p.addTriangle (31, 5, 9, 17, 31, 29); }
@@ -69,6 +91,7 @@ private:
     Kind kind;
     HoverState state;
     Smoothed morph;
+    int repeatMode = 0;
 };
 
 //==============================================================================
@@ -237,6 +260,10 @@ HeaderView::HeaderView()
     prevButton = std::make_unique<IconButton> (IconButton::Kind::prev);
     playButton = std::make_unique<IconButton> (IconButton::Kind::play);
     nextButton = std::make_unique<IconButton> (IconButton::Kind::next);
+    repeatButton = std::make_unique<IconButton> (IconButton::Kind::repeat);
+    repeatButton->onClick = [this] { if (onRepeat) onRepeat(); };
+    repeatButton->setTitle ("Repeat");
+    setRepeat (0);
     prevButton->onClick = [this] { if (onPrev) onPrev(); };
     playButton->onClick = [this] { if (onPlayPause) onPlayPause(); };
     nextButton->onClick = [this] { if (onNext) onNext(); };
@@ -247,7 +274,7 @@ HeaderView::HeaderView()
     volume = std::make_unique<VolumeSlider>();
     volume->onChange = [this] (float v) { if (onVolumeChanged) onVolumeChanged (v); };
 
-    for (auto* c : std::initializer_list<juce::Component*> { prevButton.get(), playButton.get(), nextButton.get(), volume.get() })
+    for (auto* c : std::initializer_list<juce::Component*> { prevButton.get(), playButton.get(), nextButton.get(), repeatButton.get(), volume.get() })
         addAndMakeVisible (c);
 
     artFade.snap (1.0f);
@@ -297,6 +324,12 @@ void HeaderView::setPlaying (bool p)
     playButton->setPlaying (p);
 }
 
+void HeaderView::setRepeat (int mode)
+{
+    repeatButton->setRepeat (mode);
+    repeatButton->setTooltip (mode == 0 ? "Repeat: off" : (mode == 1 ? "Repeat: all tracks in the folder" : "Repeat: this track"));
+}
+
 void HeaderView::setVolume (float v) { volume->setValue (v, false); }
 
 void HeaderView::setTimeLine (const juce::String& line)
@@ -331,7 +364,7 @@ void HeaderView::setQuickActive (QuickAction a, bool active)
 
 void HeaderView::animate (float dt)
 {
-    for (auto* a : std::initializer_list<Animated*> { prevButton.get(), playButton.get(), nextButton.get(), volume.get() })
+    for (auto* a : std::initializer_list<Animated*> { prevButton.get(), playButton.get(), nextButton.get(), repeatButton.get(), volume.get() })
         a->animate (dt);
     for (auto& q : quick)
         q->animate (dt);
@@ -463,7 +496,10 @@ void HeaderView::resized()
     // transport block (fixed size, scales a little with height)
     const int playSize = juce::jlimit (34, 52, inner / 2 + 8);
     const int sideSize = juce::roundToInt ((float) playSize * 0.72f);
-    const int transportW = sideSize * 2 + playSize + 2 * 14;
+    const int repeatSize = juce::roundToInt ((float) playSize * 0.66f);
+    const int repeatGap = 10;
+    // the repeat slot is mirrored on the left (empty for now), so play stays in the middle of the block
+    const int transportW = sideSize * 2 + playSize + 2 * 14 + 2 * (repeatGap + repeatSize);
 
     // from the right: quick grid, volume, transport; the text takes what's left, never less than 120
     const int textX = artArea().getRight() + 12;
@@ -481,9 +517,10 @@ void HeaderView::resized()
     const int transportLeft = textBounds.getRight() + 12;
     const int transportRight = volX - 12;
     const int transportX = juce::jmax (transportLeft, (transportLeft + transportRight - transportW) / 2);
-    prevButton->setBounds (transportX, (h - sideSize) / 2, sideSize, sideSize);
+    prevButton->setBounds (transportX + repeatSize + repeatGap, (h - sideSize) / 2, sideSize, sideSize);
     playButton->setBounds (prevButton->getRight() + 14, (h - playSize) / 2, playSize, playSize);
     nextButton->setBounds (playButton->getRight() + 14, (h - sideSize) / 2, sideSize, sideSize);
+    repeatButton->setBounds (nextButton->getRight() + repeatGap, (h - repeatSize) / 2, repeatSize, repeatSize);
 
     if (onLayoutChanged) onLayoutChanged();
 }

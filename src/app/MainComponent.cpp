@@ -1,6 +1,7 @@
 #include "MainComponent.h"
 #include "TrackInfo.h"
 #include "DefaultPlayer.h"
+#include "DocIcon.h"
 #include "media/Media.h"
 
 namespace tp
@@ -180,6 +181,7 @@ MainComponent::MainComponent (bool isHeadless)
     };
     header.onPrev = [this] { skip (-1); };
     header.onNext = [this] { skip (1); };
+    header.onRepeat = [this] { setRepeat ((repeatMode + 1) % 3); };
     header.onOpen = [this] { showOpenDialog(); };
     header.onVolumeChanged = [this] (float v) { engine.setVolume (v); saveSettings(); };
     header.onQuickAction = [this] (int i, QuickAction a) { runQuickAction (i, a); };
@@ -234,6 +236,8 @@ MainComponent::MainComponent (bool isHeadless)
         waveHeight = juce::jlimit (kMinWave, kMaxWave, settings->getIntValue ("waveHeight", 56));
         setUiScale ((float) settings->getDoubleValue ("uiScale", 1.0));
         taskbarPlayer = settings->getBoolValue ("taskbarPlayer", true);
+        repeatMode = juce::jlimit (0, 2, settings->getIntValue ("repeat", 0));
+        header.setRepeat (repeatMode);
     }
     engine.setEffectChain (slotGrid.effectChain());
 
@@ -267,7 +271,7 @@ MainComponent::MainComponent (bool isHeadless)
 
         vblank = juce::VBlankAttachment (this, [this] (double ts) { onVBlank (ts); });
 
-        defaultplayer::refresh();
+        defaultplayer::refresh (settings->getValue ("fileIconColour", "auto"));
         if (defaultplayer::isSupported() && settings->getValue ("defaultPrompt") != "never")
         {
             juce::Component::SafePointer<MainComponent> safe (this);
@@ -494,7 +498,8 @@ void MainComponent::tickFrame (float dt)
 
     if (engine.hasFinished() && engine.getLength() > 0.0 && ! headless)
     {
-        if (playIndex >= 0 && playIndex + 1 < playlist.size()) skip (1);
+        if (repeatMode == 2) engine.play();   // starts again from the top
+        else if (playIndex >= 0 && (playIndex + 1 < playlist.size() || repeatMode == 1)) skip (1);
         else { engine.pause(); engine.setPosition (0.0); }
     }
 
@@ -646,6 +651,7 @@ bool MainComponent::keyPressed (const juce::KeyPress& k)
     if (k.getTextCharacter() == 'p')         { skip (-1); return true; }
     if (k.getTextCharacter() == 'm')         { runQuickAction (-1, QuickAction::mono); return true; }
     if (k.getTextCharacter() == 'l')         { runQuickAction (-1, QuickAction::abLoop); return true; }
+    if (k.getTextCharacter() == 'r')         { setRepeat ((repeatMode + 1) % 3); return true; }
     if (k.getTextCharacter() == 'v' && videoLoaded) { setShowVideo (! showVideo); return true; }
     if (k.getTextCharacter() == 'f' && videoLoaded) { setFullscreenVideo (! videoFullscreen); return true; }
     if (k == juce::KeyPress::escapeKey && videoFullscreen)  { setFullscreenVideo (false); return true; }
@@ -691,7 +697,9 @@ void MainComponent::skip (int direction)
     if (playlist.isEmpty()) return;
     if (direction < 0 && engine.getSmoothPosition() > 3.0) { engine.setPosition (0.0); return; }
 
-    const int next = playIndex + direction;
+    int next = playIndex + direction;
+    if (repeatMode == 1)
+        next = (next + playlist.size()) % playlist.size();   // repeat all wraps round the folder
     if (juce::isPositiveAndBelow (next, playlist.size()))
     {
         const bool wasPlaying = engine.isPlaying() || engine.hasFinished();
@@ -729,6 +737,8 @@ void MainComponent::showMainMenu()
    #if JUCE_WINDOWS
     m.addItem (9, "Taskbar mini player", true, taskbarPlayer);
    #endif
+    if (defaultplayer::canColourIcons())
+        m.addItem (13, utf8 ("File icon colour\xe2\x80\xa6"));
     m.addSeparator();
     m.addItem (6, "About Transport");
     m.addItem (7, "Quit");
@@ -760,6 +770,7 @@ void MainComponent::showMainMenu()
         else if (r == 10) self.toast (defaultplayer::makeDefault());
         else if (r == 11) self.setShowVideo (! self.showVideo);
         else if (r == 12) self.setFullscreenVideo (! self.videoFullscreen);
+        else if (r == 13) self.showIconColourMenu();
         else if (r == 9)
         {
             self.taskbarPlayer = ! self.taskbarPlayer;
@@ -771,6 +782,103 @@ void MainComponent::showMainMenu()
         else if (r >= 300) { self.waveform.setStyle ((WaveformView::Style) (r - 300)); self.saveSettings(); }
         else if (r > 200) { self.quickColumns = r - 200; self.quick.resize ((size_t) self.quickColumns * 2, QuickAction::open); self.applyQuickActions(); self.saveSettings(); }
     });
+}
+
+void MainComponent::setRepeat (int mode)
+{
+    repeatMode = mode;
+    header.setRepeat (mode);
+    toast (mode == 0 ? "Repeat off" : (mode == 1 ? "Repeat all" : "Repeat this track"));
+    saveSettings();
+}
+
+namespace
+{
+juce::Image swatchImage (juce::Colour c)
+{
+    juce::Image img (juce::Image::ARGB, 32, 32, true);
+    juce::Graphics g (img);
+    g.setColour (c);
+    g.fillRoundedRectangle (2.0f, 2.0f, 28.0f, 28.0f, 7.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.35f));
+    g.drawRoundedRectangle (2.5f, 2.5f, 27.0f, 27.0f, 7.0f, 1.0f);
+    return img;
+}
+
+/** Colour wheel for "Custom colour": applies when the user clicks Apply. */
+class IconColourPicker final : public juce::Component
+{
+public:
+    explicit IconColourPicker (juce::Colour start)
+    {
+        selector.setCurrentColour (start.withAlpha (1.0f), juce::dontSendNotification);
+        selector.setColour (juce::ColourSelector::backgroundColourId, juce::Colours::transparentBlack);
+        addAndMakeVisible (selector);
+        apply.setButtonText ("Apply");
+        apply.onClick = [this]
+        {
+            if (onApply) onApply (selector.getCurrentColour());
+            if (auto* box = findParentComponentOfClass<juce::CallOutBox>()) box->dismiss();
+        };
+        addAndMakeVisible (apply);
+        setSize (260, 300);
+    }
+
+    std::function<void (juce::Colour)> onApply;
+
+    void resized() override
+    {
+        auto r = getLocalBounds().reduced (6);
+        apply.setBounds (r.removeFromBottom (28).withSizeKeepingCentre (100, 28));
+        selector.setBounds (r.withTrimmedBottom (6));
+    }
+
+private:
+    juce::ColourSelector selector { juce::ColourSelector::showColourspace | juce::ColourSelector::showSliders };
+    juce::TextButton apply;
+};
+} // namespace
+
+void MainComponent::showIconColourMenu()
+{
+    const auto current = properties.getUserSettings()->getValue ("fileIconColour", "auto");
+    juce::PopupMenu m;
+    m.addSectionHeader ("Colour of the file icons in Explorer");
+    m.addItem (1, "Match Windows (light or dark)", true, current == "auto");
+    m.addSeparator();
+    int id = 10;
+    for (auto& s : docicon::swatches)
+        m.addItem (id++, s.name, true, current == s.id, swatchImage (juce::Colour (s.argb)));
+    m.addSeparator();
+    const bool custom = current.startsWithChar ('#');
+    m.addItem (2, utf8 ("Custom colour\xe2\x80\xa6"), true, custom, custom ? swatchImage (defaultplayer::resolveIconColour (current)) : juce::Image());
+
+    juce::Component::SafePointer<MainComponent> safe (this);
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&titleBar).withTargetScreenArea (
+                         titleBar.getScreenBounds().withWidth (header.coverRight())),
+                     [safe, current] (int r)
+    {
+        if (safe == nullptr || r == 0) return;
+        if (r == 1) safe->applyIconColour ("auto");
+        else if (r >= 10) safe->applyIconColour (docicon::swatches[r - 10].id);
+        else if (r == 2)
+        {
+            auto picker = std::make_unique<IconColourPicker> (defaultplayer::resolveIconColour (current));
+            picker->onApply = [safe] (juce::Colour c)
+            {
+                if (safe != nullptr) safe->applyIconColour ("#" + c.toDisplayString (false).toLowerCase());
+            };
+            juce::CallOutBox::launchAsynchronously (std::move (picker), safe->titleBar.getScreenBounds().withWidth (safe->header.coverRight()), nullptr);
+        }
+    });
+}
+
+void MainComponent::applyIconColour (const juce::String& setting)
+{
+    auto* s = properties.getUserSettings();
+    s->setValue ("fileIconColour", setting);
+    s->saveIfNeeded();
+    toast (defaultplayer::setIconColour (setting));
 }
 
 void MainComponent::setCustomizing (bool c)
@@ -1070,6 +1178,7 @@ void MainComponent::saveSettings()
     s->setValue ("waveHeight", waveHeight);
     s->setValue ("uiScale", (double) uiScale);
     s->setValue ("taskbarPlayer", taskbarPlayer);
+    s->setValue ("repeat", repeatMode);
     s->setValue ("showVideo", showVideo);
     s->setValue ("waveStyle", WaveformView::styleIds()[(int) waveform.getStyle()]);
     s->setValue ("slotStates", juce::JSON::toString (juce::var (slotGrid.getStates()), true));

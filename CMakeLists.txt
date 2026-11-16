@@ -103,6 +103,7 @@ target_sources(Transport PRIVATE
     src/app/TitleBar.cpp
     src/app/TaskbarPlayer.cpp
     src/app/DefaultPlayer.cpp
+    src/app/DocIcon.cpp
     src/app/VideoPlayer.cpp
     src/app/VideoView.cpp
     src/app/media/MediaCommon.cpp

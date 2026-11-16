@@ -45,6 +45,8 @@ public:
     bool isPlayingNow()   { return engine.isPlaying(); }
     juce::Image renderMiniPlayer (int width, int height);
     juce::String miniPlayerKey();
+    /** 0 off, 1 repeat all, 2 repeat one. */
+    void setRepeat (int mode);
     bool isTaskbarPlayerEnabled() const { return taskbarPlayer; }
     std::function<void (bool)> onTaskbarPlayerChanged;
 
@@ -115,6 +117,9 @@ private:
 
     juce::Array<juce::File> playlist;
     int playIndex = -1;
+    int repeatMode = 0;   // 0 off, 1 all (wraps round the folder), 2 one
+    void showIconColourMenu();
+    void applyIconColour (const juce::String& setting);
     double loopA = -1.0, loopB = -1.0;
 
     class Splitter;
