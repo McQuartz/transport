@@ -23,6 +23,8 @@ public:
     void setRepeat (int mode);
     void setShuffle (bool on);
     void setVolume (float v);
+    /** The slider's top end (volume 1 = 0 dB sits below it, marked on the line). */
+    void setVolumeMaximum (float maxVolume);
     void setQuickActions (const std::vector<QuickAction>& actions, int columns);
     void setQuickActive (QuickAction a, bool active);
     void setTimeLine (const juce::String& line);

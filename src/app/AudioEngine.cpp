@@ -288,6 +288,6 @@ void AudioEngine::collectGarbage()
 
 void AudioEngine::setVolume (float v)
 {
-    volume = juce::jlimit (0.0f, 1.0f, v);
+    volume = juce::jlimit (0.0f, maxVolume, v);
 }
 } // namespace tp

@@ -41,7 +41,9 @@ public:
     /** What is coming out of the speakers right now (smooth position minus output latency): the video clock. */
     double getAudiblePosition() const;
 
-    void  setVolume (float zeroToOne);
+    /** 1 = unity gain; the gain is volume squared, so the top, 1.4125, is +6 dB. */
+    static constexpr float maxVolume = 1.4125375f;
+    void  setVolume (float zeroToMax);
     float getVolume() const     { return volume.load(); }
 
     double getSampleRate() const { return currentSampleRate.load(); }

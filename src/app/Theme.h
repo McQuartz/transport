@@ -45,6 +45,32 @@ inline const juce::Colour field        { 0xff121215 };
 inline const juce::Colour outline      { 0xff28282c };   // 1 px frame around plugin slots
 inline const juce::Colour hairline     { 0xff3d3d42 };   // lines between title bar, header, waveform
 
+/** Dark is the palette everything is designed in. Ash and Light are produced from it when painting
+    (ThemeRender.h): only greys move, colours (accent, meters, cover art) stay as they are. */
+enum class Mode { dark = 0, ash = 1, light = 2 };
+
+inline Mode& currentRef() { static Mode m = Mode::dark; return m; }
+inline Mode current()     { return currentRef(); }
+inline void setCurrent (Mode m) { currentRef() = m; }
+
+/** A colour as it shows in the current theme. */
+inline juce::Colour map (juce::Colour c)
+{
+    const auto mode = current();
+    if (mode == Mode::dark) return c;
+    const float r = c.getFloatRed(), g = c.getFloatGreen(), b = c.getFloatBlue();
+    const float hi = juce::jmax (r, g, b), lo = juce::jmin (r, g, b);
+    if (hi - lo > 0.12f) return c;    // a real colour: keep it
+    if (mode == Mode::light && hi < 0.02f && c.getAlpha() < 255) return c;   // shadows and dimming stay dark
+
+    auto f = [mode] (float x)
+    {
+        if (mode == Mode::ash) return 0.14f + 0.86f * x;       // lifts the blacks to soft charcoal
+        return 0.955f - 0.885f * x;                            // light: the greys turn round, white type goes near-black
+    };
+    return juce::Colour::fromFloatRGBA (f (r), f (g), f (b), c.getFloatAlpha());
+}
+
 inline juce::String sansName()
 {
    #if JUCE_WINDOWS
