@@ -112,7 +112,7 @@ private:
         g.setGradientFill (shade);
         g.fillRect (face.withHeight (40));
 
-        const float cx = 150.0f, cy = 178.0f, R = 124.0f;   // pivot inside the face, so the needle has a visible anchor
+        const float cx = 150.0f, cy = 222.0f, R = 150.0f;
         juce::Path arc;
         arc.addCentredArc (cx, cy, R, R, 0, degToRad (-48), degToRad (48), true);
         g.setColour (theme::scale);
@@ -148,7 +148,7 @@ private:
 
         g.setColour (Colour (0xffcfcfcf));
         g.setFont (juce::Font (juce::FontOptions (theme::sansName(), 17.0f, juce::Font::bold)));
-        g.drawText ("VU", Rectangle<float> (cx - 40, 126, 80, 20), juce::Justification::centred, false);
+        g.drawText ("VU", Rectangle<float> (cx - 40, 112, 80, 20), juce::Justification::centred, false);
         if (channel != nullptr)
         {
             g.setFont (theme::font (11.0f, true));
@@ -170,22 +170,21 @@ private:
         g.setFont (theme::font (8.0f, true));
         g.drawText ("PEAK", Rectangle<float> (lamp.x - 40, lamp.y - 6, 32, 12), juce::Justification::centredRight, false);
 
-        // needle, then the pivot it turns on
+        // needle, then the hub cap over its pivot
         const float a = degToRad (needles[ch].position);
         const Point<float> tip (cx + (R + 6.0f) * std::sin (a), cy - (R + 6.0f) * std::cos (a));
         g.setColour (juce::Colours::black.withAlpha (0.22f));
         g.drawLine ({ { cx + 2, cy }, tip.translated (2, 3) }, 2.2f);
         g.setColour (Colour (0xfff2f2f2));
         g.drawLine ({ { cx, cy }, tip }, 1.8f);
-        // pivot: a small screw head the needle turns on
-        g.setColour (juce::Colours::black.withAlpha (0.25f));
-        g.fillEllipse (Rectangle<float> (17, 17).withCentre ({ cx + 1, cy + 2 }));
+        // hub cap centred on the pivot, so the needle always leaves it at the same point (a fixed anchor)
+        const float hub = 50.0f;
         g.setColour (Colour (0xff3a3a3a));
-        g.fillEllipse (Rectangle<float> (16, 16).withCentre ({ cx, cy }));
-        g.setColour (Colour (0xff6a6a6a));
-        g.drawEllipse (Rectangle<float> (16, 16).withCentre ({ cx, cy }), 1.0f);
-        g.setColour (Colour (0xfff2f2f2));
-        g.fillEllipse (Rectangle<float> (5, 5).withCentre ({ cx, cy }));
+        g.fillEllipse (Rectangle<float> (hub * 2, hub * 2).withCentre ({ cx, cy }));
+        g.setColour (Colour (0xff4a4a4a));
+        g.drawEllipse (Rectangle<float> (hub * 2, hub * 2).withCentre ({ cx, cy }), 1.0f);
+        g.setColour (Colour (0xff4f4f4f));
+        g.drawEllipse (Rectangle<float> (hub * 1.4f, hub * 1.4f).withCentre ({ cx, cy }), 1.0f);
     }
 
     static float vuToAngle (float vu)

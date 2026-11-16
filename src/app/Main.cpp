@@ -275,6 +275,25 @@ int runSnapshot (const juce::StringArray& args)
         main->tickFrame (1.0f / 60.0f);
     }
 
+    if (args.contains ("--bench"))
+    {
+        // frame cost while playing: analysis + plugin updates, and painting the whole window
+        double tickMs = 0.0, paintMs = 0.0;
+        const int n = 300;
+        for (int i = 0; i < n; ++i)
+        {
+            const auto t0 = juce::Time::getMillisecondCounterHiRes();
+            main->getEngine().renderOffline (735);
+            main->tickFrame (1.0f / 60.0f);
+            const auto t1 = juce::Time::getMillisecondCounterHiRes();
+            juce::ignoreUnused (main->createComponentSnapshot (main->getLocalBounds(), true, 1.0f));
+            const auto t2 = juce::Time::getMillisecondCounterHiRes();
+            tickMs += t1 - t0;
+            paintMs += t2 - t1;
+        }
+        std::printf ("bench: tick %.2f ms, paint %.2f ms per frame (%d frames)\n", tickMs / n, paintMs / n, n);
+    }
+
     if (main->hasVideo() && ! main->syncVideoNow (8000))
         std::printf ("video frame not ready\n");
 
@@ -314,6 +333,46 @@ int runDocIcons (const juce::StringArray& args)
             }
         }
     }
+    out.deleteFile();
+    juce::FileOutputStream stream (out);
+    juce::PNGImageFormat png;
+    const bool ok = stream.openedOk() && png.writeImageToStream (sheet, stream);
+    std::printf ("%s %s\n", ok ? "wrote" : "FAILED", out.getFullPathName().toRawUTF8());
+    return ok ? 0 : 1;
+}
+
+/** --quick-icons out.png: every quick-access button as a 36 px tile, shown 3x, one row per monitor-icon design. */
+int runQuickIcons (const juce::StringArray& args)
+{
+    const int i = args.indexOf ("--quick-icons");
+    const auto out = juce::File::getCurrentWorkingDirectory().getChildFile (i + 1 < args.size() ? args[i + 1].unquoted() : "quick-icons.png");
+    const int z = 3, tile = 36, cell = (tile + 10) * z;
+    const auto& list = quickActions();
+    juce::Image sheet (juce::Image::ARGB, cell * 10, cell * 5, true);
+    juce::Graphics g (sheet);
+    g.fillAll (theme::header);
+    // rows 0-1: today; rows 2-3: proposal with the cleaned-up faders; row 4: monitor as headphones
+    for (int variant = 0; variant < 3; ++variant)
+    {
+        quickIconVariant() = variant;
+        for (size_t k = 0; k < list.size(); ++k)
+        {
+            if (variant == 2 && k > 0) break;
+            const int row = variant * 2 + (int) k / 10;
+            const int col = (int) k % 10;
+            juce::Graphics::ScopedSaveState s (g);
+            g.addTransform (juce::AffineTransform::scale ((float) z).translated ((float) (col * cell + 5 * z), (float) (row * cell + 5 * z)));
+            const auto r = juce::Rectangle<float> (0, 0, (float) tile, (float) tile);
+            g.setColour (juce::Colour (0xff424242));
+            g.fillRoundedRectangle (r, 5.0f);
+            g.setColour (juce::Colours::white.withAlpha (0.05f));
+            g.drawRoundedRectangle (r.reduced (0.5f), 5.0f, 1.0f);
+            const float kk = tile / 62.0f;
+            g.addTransform (juce::AffineTransform::scale (kk * 1.05f, kk * 1.05f, r.getCentreX(), r.getCentreY()));
+            drawQuickActionIcon (g, list[k].action, r, juce::Colour (0xff9e9e9e));
+        }
+    }
+    quickIconVariant() = 0;
     out.deleteFile();
     juce::FileOutputStream stream (out);
     juce::PNGImageFormat png;
@@ -471,6 +530,12 @@ public:
             quit();
             return;
         }
+        if (args.contains ("--quick-icons"))
+        {
+            setApplicationReturnValue (runQuickIcons (args));
+            quit();
+            return;
+        }
         if (args.contains ("--doc-icons"))
         {
             setApplicationReturnValue (runDocIcons (args));
@@ -499,7 +564,12 @@ public:
     void anotherInstanceStarted (const juce::String& commandLine) override
     {
         openFromCommandLine (commandLine);
-        if (window != nullptr) window->toFront (true);
+        if (window != nullptr)
+        {
+            if (window->isMinimised()) window->setMinimised (false);
+            window->setVisible (true);
+            TaskbarPlayer::bringToFront (*window);
+        }
     }
 
 private:

@@ -477,12 +477,18 @@ void MainComponent::tickFrame (float dt)
         silenceDebt = 0.0f;
     }
 
-    // 2. analysis + plugins
-    analyzer.computeFrame (frame, dt);
-    frame.positionSeconds = engine.getSmoothPosition();
-    frame.lengthSeconds = engine.getLength();
-    frame.playing = engine.isPlaying();
-    slotGrid.updateFrame (frame, dt);
+    // 2. analysis + plugins (skipped while the window is minimised: nobody sees them, and the FFTs and
+    //    plugin updates are most of a frame's work besides painting)
+    const auto* peer = getPeer();
+    const bool minimised = ! headless && peer != nullptr && peer->isMinimised();
+    if (! minimised)
+    {
+        analyzer.computeFrame (frame, dt);
+        frame.positionSeconds = engine.getSmoothPosition();
+        frame.lengthSeconds = engine.getLength();
+        frame.playing = engine.isPlaying();
+        slotGrid.updateFrame (frame, dt);
+    }
     engine.collectGarbage();
 
     if (settingsDirtyFor >= 0.0f && (settingsDirtyFor += dt) > 0.8f)

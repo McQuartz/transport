@@ -286,6 +286,24 @@ TaskbarPlayer::~TaskbarPlayer() = default;
 bool TaskbarPlayer::isSupported() { return true; }
 void TaskbarPlayer::setEnabled (bool e) { impl->setEnabled (e); }
 
+void TaskbarPlayer::bringToFront (juce::Component& window)
+{
+    auto hwnd = (HWND) window.getWindowHandle();
+    if (hwnd == nullptr) return;
+    if (IsIconic (hwnd)) ShowWindow (hwnd, SW_RESTORE);
+
+    // Windows only lets the foreground thread hand out the foreground: borrow its input queue for a moment
+    const DWORD fgThread = GetWindowThreadProcessId (GetForegroundWindow(), nullptr);
+    const DWORD myThread = GetCurrentThreadId();
+    const bool attached = fgThread != 0 && fgThread != myThread && AttachThreadInput (myThread, fgThread, TRUE);
+    BringWindowToTop (hwnd);
+    SetForegroundWindow (hwnd);
+    SetFocus (hwnd);
+    if (attached) AttachThreadInput (myThread, fgThread, FALSE);
+    if (GetForegroundWindow() != hwnd)
+        FlashWindow (hwnd, TRUE);   // still refused: at least make the taskbar button blink
+}
+
 #else
 
 struct TaskbarPlayer::Impl {};
@@ -293,6 +311,13 @@ TaskbarPlayer::TaskbarPlayer (juce::Component&) {}
 TaskbarPlayer::~TaskbarPlayer() = default;
 bool TaskbarPlayer::isSupported() { return false; }
 void TaskbarPlayer::setEnabled (bool) {}
+void TaskbarPlayer::bringToFront (juce::Component& window)
+{
+    if (auto* dw = dynamic_cast<juce::DocumentWindow*> (&window); dw != nullptr && dw->isMinimised())
+        dw->setMinimised (false);
+    juce::Process::makeForegroundProcess();
+    window.toFront (true);
+}
 
 #endif
 } // namespace tp
