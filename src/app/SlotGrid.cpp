@@ -1,3 +1,4 @@
+#include <tuple>
 #include "SlotGrid.h"
 
 namespace tp
@@ -249,12 +250,52 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.setColour (theme::panel.interpolatedWith (theme::panelHover, hover.current * 0.35f));
-        g.fillRoundedRectangle (getLocalBounds().toFloat(), 3.0f);
+        const int st = tp::style();
+        const auto r = getLocalBounds().toFloat();
+        const float radius = st == 1 ? 0.0f : st == 2 ? 2.0f : st == 3 ? 4.0f : st == 4 ? 12.0f : st == 5 ? 0.0f : 3.0f;
+        if (st != 5)
+        {
+            g.setColour (theme::panel.interpolatedWith (theme::panelHover, hover.current * 0.35f));
+            g.fillRoundedRectangle (r, radius);
+        }
+        if (st == 1)
+        {
+            g.setColour (tp::C (0xff626262));
+            g.drawRect (r, 1.0f);
+        }
+        else if (st == 3)
+        {
+            g.setColour (juce::Colours::black.withAlpha (0.22f));
+            g.fillRoundedRectangle (r.withHeight (30.0f), radius);
+            g.setColour (juce::Colours::black.withAlpha (0.45f));
+            g.fillRect (r.withY (30.0f).withHeight (1.0f));
+        }
+        else if (st == 5)
+        {
+            g.setColour (tp::C (0xff707070));
+            if (getX() > 10) g.fillRect (0.0f, 0.0f, 1.0f, r.getHeight());
+            if (getY() > 10) g.fillRect (0.0f, 0.0f, r.getWidth(), 1.0f);
+        }
+    }
+
+    void paintCorners (juce::Graphics& g)
+    {
+        if (tp::style() != 2) return;
+        // crop marks at the four corners, like a measuring instrument's graticule
+        const auto r = getLocalBounds().toFloat().reduced (3.0f);
+        const float L = 9.0f;
+        g.setColour (tp::C (0xff9c9c9c));
+        for (auto [x, y, dx, dy] : { std::tuple { r.getX(), r.getY(), 1.0f, 1.0f }, std::tuple { r.getRight(), r.getY(), -1.0f, 1.0f },
+                                     std::tuple { r.getX(), r.getBottom(), 1.0f, -1.0f }, std::tuple { r.getRight(), r.getBottom(), -1.0f, -1.0f } })
+        {
+            g.fillRect (juce::Rectangle<float> (x, y, dx * L, dy * 1.5f).withSize (L, 1.5f).withPosition (dx > 0 ? x : x - L, dy > 0 ? y : y - 1.5f));
+            g.fillRect (juce::Rectangle<float> (dx > 0 ? x : x - 1.5f, dy > 0 ? y : y - L, 1.5f, L));
+        }
     }
 
     void paintOverChildren (juce::Graphics& g) override
     {
+        paintCorners (g);
         if (bypassShade.current > 0.01f)
         {
             g.setColour (juce::Colours::black.withAlpha (0.28f * bypassShade.current));
@@ -283,7 +324,7 @@ public:
             if (c > 0.01f)
             {
                 // solid strip so the plugin's own labels don't show through
-                g.setColour (Colour (0xff2c2c2c).withAlpha (0.96f * c));
+                g.setColour (tp::C (0xff2c2c2c).withAlpha (0.96f * c));
                 g.fillRoundedRectangle (getLocalBounds().toFloat().removeFromTop (32.0f), 3.0f);
                 g.setColour (juce::Colours::white.withAlpha (c));
                 g.setFont (theme::font (10.0f, true));
@@ -295,10 +336,10 @@ public:
             {
                 const auto r = buttonRect (i, (int) btns.size());
                 const auto kind = btns[(size_t) i];
-                g.setColour (Colour (0xff2e2e2e).interpolatedWith (kind == Btn::remove ? Colour (0xff6a3a2e) : Colour (0xff4a4a4a), buttonHover[i].current).withAlpha (0.9f * h));
+                g.setColour (tp::C (0xff2e2e2e).interpolatedWith (kind == Btn::remove ? tp::C (0xff6a3a2e) : tp::C (0xff4a4a4a), buttonHover[i].current).withAlpha (0.9f * h));
                 g.fillRoundedRectangle (r, 3.0f);
-                auto iconColour = Colour (0xffd6d6d6).interpolatedWith (juce::Colours::white, buttonHover[i].current);
-                if (kind == Btn::power) iconColour = isBypassed() ? Colour (0xff8a8a8a) : theme::accent;
+                auto iconColour = tp::C (0xffd6d6d6).interpolatedWith (juce::Colours::white, buttonHover[i].current);
+                if (kind == Btn::power) iconColour = isBypassed() ? tp::C (0xff8a8a8a) : theme::accent;
                 g.setColour (iconColour.withAlpha (h));
                 const auto cc = r.getCentre();
                 juce::Path p;

@@ -14,19 +14,19 @@ public:
     TransportLookAndFeel() : juce::LookAndFeel_V4 (getDarkColourScheme())
     {
         using juce::Colour;
-        setColour (juce::PopupMenu::backgroundColourId, Colour (0xff2a2a2a));
-        setColour (juce::PopupMenu::highlightedBackgroundColourId, Colour (0xff4a4a4a));
+        setColour (juce::PopupMenu::backgroundColourId, tp::C (0xff2a2a2a));
+        setColour (juce::PopupMenu::highlightedBackgroundColourId, tp::C (0xff4a4a4a));
         setColour (juce::PopupMenu::textColourId, juce::Colours::white);
         setColour (juce::PopupMenu::highlightedTextColourId, juce::Colours::white);
         setColour (juce::PopupMenu::headerTextColourId, theme::accent);
-        setColour (juce::TooltipWindow::backgroundColourId, Colour (0xff1f1f1f));
+        setColour (juce::TooltipWindow::backgroundColourId, tp::C (0xff1f1f1f));
         setColour (juce::TooltipWindow::textColourId, juce::Colours::white);
-        setColour (juce::TooltipWindow::outlineColourId, Colour (0xff5c5c5c));
+        setColour (juce::TooltipWindow::outlineColourId, tp::C (0xff5c5c5c));
         setColour (juce::ResizableWindow::backgroundColourId, theme::dialog);
         setColour (juce::AlertWindow::backgroundColourId, theme::dialog);
         setColour (juce::TextButton::buttonColourId, theme::button);
         setColour (juce::ComboBox::backgroundColourId, theme::field);
-        setColour (juce::ComboBox::outlineColourId, Colour (0xff5c5c5c));
+        setColour (juce::ComboBox::outlineColourId, tp::C (0xff5c5c5c));
 
        #if JUCE_WINDOWS
         setDefaultSansSerifTypefaceName ("Segoe UI");
@@ -39,7 +39,7 @@ public:
     void drawPopupMenuBackground (juce::Graphics& g, int w, int h) override
     {
         g.fillAll (findColour (juce::PopupMenu::backgroundColourId));
-        g.setColour (juce::Colour (0xff4a4a4a));
+        g.setColour (tp::C (0xff4a4a4a));
         g.drawRect (0, 0, w, h);
     }
 };
@@ -329,7 +329,7 @@ int runDocIcons (const juce::StringArray& args)
     for (int half = 0; half < 2; ++half)
     {
         const int x0 = half * (sheet.getWidth() / 2);
-        g.setColour (half == 0 ? juce::Colour (0xffececec) : juce::Colour (0xff1e1e1e));
+        g.setColour (half == 0 ? tp::C (0xffececec) : tp::C (0xff1e1e1e));
         g.fillRect (x0, 0, sheet.getWidth() / 2, sheet.getHeight());
         for (int r = 0; r < rows; ++r)
         {
@@ -374,13 +374,13 @@ int runQuickIcons (const juce::StringArray& args)
             juce::Graphics::ScopedSaveState s (g);
             g.addTransform (juce::AffineTransform::scale ((float) z).translated ((float) (col * cell + 5 * z), (float) (row * cell + 5 * z)));
             const auto r = juce::Rectangle<float> (0, 0, (float) tile, (float) tile);
-            g.setColour (juce::Colour (0xff424242));
+            g.setColour (tp::C (0xff424242));
             g.fillRoundedRectangle (r, 5.0f);
             g.setColour (juce::Colours::white.withAlpha (0.05f));
             g.drawRoundedRectangle (r.reduced (0.5f), 5.0f, 1.0f);
             const float kk = tile / 62.0f;
             g.addTransform (juce::AffineTransform::scale (kk * 1.05f, kk * 1.05f, r.getCentreX(), r.getCentreY()));
-            drawQuickActionIcon (g, list[k].action, r, juce::Colour (0xff9e9e9e));
+            drawQuickActionIcon (g, list[k].action, r, tp::C (0xff9e9e9e));
         }
     }
     quickIconVariant() = 2;

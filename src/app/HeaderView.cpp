@@ -83,6 +83,28 @@ public:
         }
 
         g.setColour (theme::icon.interpolatedWith (theme::iconBright, juce::jmax (state.hover.current * 0.75f, kind == Kind::play ? morph.current * 0.7f : 0.0f)));
+        if (kind == Kind::play)
+        {
+            const int st = tp::style();
+            const auto ring = juce::Rectangle<float> (-2.0f, 0.0f, 50.0f, 50.0f);
+            if (st == 2)
+            {
+                g.drawEllipse (ring.reduced (1.0f), 2.0f);
+                g.addTransform (juce::AffineTransform::scale (0.62f, 0.62f, 23.0f, 25.0f));
+            }
+            else if (st == 3)
+            {
+                g.drawRoundedRectangle (ring.reduced (2.0f), 8.0f, 2.0f);
+                g.addTransform (juce::AffineTransform::scale (0.6f, 0.6f, 23.0f, 25.0f));
+            }
+            else if (st == 4)
+            {
+                g.setColour (tp::C (0xfff2f2f2).interpolatedWith (juce::Colours::white, state.hover.current));
+                g.fillEllipse (ring);
+                g.setColour (tp::C (0xff1b1b1b));
+                g.addTransform (juce::AffineTransform::scale (0.55f, 0.55f, 23.0f, 25.0f).translated (morph.current > 0.5f ? 0.0f : 2.0f, 0.0f));
+            }
+        }
         juce::Path p;
         if (kind == Kind::prev)      { p.addRectangle (3, 5, 4, 24); p.addTriangle (31, 5, 9, 17, 31, 29); }
         else if (kind == Kind::next) { p.addTriangle (3, 5, 25, 17, 3, 29); p.addRectangle (27, 5, 4, 24); }
@@ -176,9 +198,9 @@ public:
         const auto track = trackArea();
         const float th = 3.0f + hover.current * 1.0f;
         const auto line = Rectangle<float> (track.getX(), cy - th * 0.5f, track.getWidth(), th);
-        g.setColour (Colour (0xff595959));
+        g.setColour (tp::C (0xff595959));
         g.fillRoundedRectangle (line, th * 0.5f);
-        g.setColour (Colour (0xffdedede));
+        g.setColour (tp::C (0xffdedede));
         g.fillRoundedRectangle (line.withWidth (line.getWidth() * shown.current), th * 0.5f);
 
         const float r = 5.5f + hover.current * 1.5f + drag.current;
@@ -254,7 +276,7 @@ public:
         const float s = 1.0f - 0.04f * state.press.current;
         r = r.withSizeKeepingCentre (r.getWidth() * s, r.getHeight() * s);
 
-        g.setColour (Colour (0xff424242).interpolatedWith (Colour (0xff4d4d4d), state.hover.current));
+        g.setColour (tp::C (0xff424242).interpolatedWith (tp::C (0xff4d4d4d), state.hover.current));
         g.fillRoundedRectangle (r, 5.0f);
         g.setColour (juce::Colours::white.withAlpha (0.05f + 0.04f * state.hover.current));
         g.drawRoundedRectangle (r.reduced (0.5f), 5.0f, 1.0f);
@@ -266,7 +288,7 @@ public:
 
         // icons are drawn for a ~60px tile; scale them to this tile
         const float k = juce::jmin (r.getWidth(), r.getHeight()) / 62.0f;
-        const auto iconColour = Colour (0xff9e9e9e).interpolatedWith (juce::Colours::white, state.hover.current * 0.5f)
+        const auto iconColour = tp::C (0xff9e9e9e).interpolatedWith (juce::Colours::white, state.hover.current * 0.5f)
                                                    .interpolatedWith (theme::accent, active.current);
         juce::Graphics::ScopedSaveState save (g);
         g.addTransform (juce::AffineTransform::scale (k * 1.05f, k * 1.05f, r.getCentreX(), r.getCentreY()));
@@ -424,12 +446,12 @@ void HeaderView::paintArt (juce::Graphics& g, Rectangle<float> r, const juce::Im
     }
 
     const float s = r.getWidth() / 136.0f;
-    g.setColour (Colour (0xff262626).withMultipliedAlpha (alpha));
+    g.setColour (tp::C (0xff262626).withMultipliedAlpha (alpha));
     g.fillRect (r);
     const auto c = r.getCentre();
-    g.setColour (Colour (0xff1c1c1c).withMultipliedAlpha (alpha));
+    g.setColour (tp::C (0xff1c1c1c).withMultipliedAlpha (alpha));
     g.fillEllipse (Rectangle<float> (112 * s, 112 * s).withCentre (c));
-    g.setColour (Colour (0xff2f2f2f).withMultipliedAlpha (alpha));
+    g.setColour (tp::C (0xff2f2f2f).withMultipliedAlpha (alpha));
     for (float rad : { 48.0f, 41.0f, 34.0f, 27.0f })
         g.drawEllipse (Rectangle<float> (rad * 2 * s, rad * 2 * s).withCentre (c), 1.0f);
 
@@ -442,7 +464,7 @@ void HeaderView::paintArt (juce::Graphics& g, Rectangle<float> r, const juce::Im
 
     g.setColour (theme::accent.withMultipliedAlpha (alpha));
     g.fillEllipse (Rectangle<float> (34 * s, 34 * s).withCentre (c));
-    g.setColour (Colour (0xff1c1c1c).withMultipliedAlpha (alpha));
+    g.setColour (tp::C (0xff1c1c1c).withMultipliedAlpha (alpha));
     g.fillEllipse (Rectangle<float> (5 * s, 5 * s).withCentre (c));
 }
 
@@ -473,13 +495,13 @@ void HeaderView::paint (juce::Graphics& g)
         g.drawText (t, r.withHeight (titlePx * 1.45f), juce::Justification::topLeft, true);
         if (a.isNotEmpty())
         {
-            g.setColour (Colour (0xffc8c8c8).withAlpha (alpha));
+            g.setColour (tp::C (0xffc8c8c8).withAlpha (alpha));
             g.setFont (theme::font (titlePx * 0.78f));
             g.drawText (a, r.withTrimmedTop (titlePx * 1.45f).withHeight (titlePx * 1.2f), juce::Justification::topLeft, true);
         }
 
-        g.setFont (theme::font (11.0f));
-        g.setColour (Colour (0xffb8b8b8).withAlpha (alpha));
+        g.setFont (tp::style() == 1 || tp::style() == 2 ? theme::mono (10.5f, false) : theme::font (11.0f));
+        g.setColour (tp::C (0xffb8b8b8).withAlpha (alpha));
         juce::StringArray all;
         if (roomy)
         {
