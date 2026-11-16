@@ -180,7 +180,7 @@ public:
     }
 
 private:
-    float trackY() const { return (float) getHeight() * 0.62f; }
+    float trackY() const { return (float) getHeight() * 0.5f; }   // centred, so it lines up with the buttons
     Rectangle<float> trackArea() const { return getLocalBounds().toFloat().withTrimmedLeft (28).withTrimmedRight (8); }
     void setFromX (float x) { const auto t = trackArea(); setValue ((x - t.getX()) / t.getWidth(), true); }
     void toggleMute()
@@ -245,7 +245,7 @@ public:
         const auto iconColour = Colour (0xff9e9e9e).interpolatedWith (juce::Colours::white, state.hover.current * 0.5f)
                                                    .interpolatedWith (theme::accent, active.current);
         juce::Graphics::ScopedSaveState save (g);
-        g.addTransform (juce::AffineTransform::scale (k * 0.82f, k * 0.82f, r.getCentreX(), r.getCentreY()));
+        g.addTransform (juce::AffineTransform::scale (k * 1.05f, k * 1.05f, r.getCentreX(), r.getCentreY()));
         drawQuickActionIcon (g, action, r, iconColour);
     }
 
@@ -334,7 +334,7 @@ void HeaderView::setVolume (float v) { volume->setValue (v, false); }
 
 void HeaderView::setTimeLine (const juce::String& line)
 {
-    if (line != timeLine) { timeLine = line; repaint (textArea()); }
+    if (line != timeLine) { timeLine = line; repaint (textArea().expanded (0, 10)); }
 }
 
 void HeaderView::setQuickActions (const std::vector<QuickAction>& actions, int columns)
@@ -376,7 +376,7 @@ void HeaderView::animate (float dt)
         dirtyArt = true;
     }
     if (dirtyArt) repaint (artArea());
-    if (textFade.tick (dt, 9.0f)) repaint (textArea());
+    if (textFade.tick (dt, 9.0f)) repaint (textArea().expanded (0, 10));   // the text slides 8 px out of its box
 }
 
 void HeaderView::paintArt (juce::Graphics& g, Rectangle<float> r, const juce::Image& img, float alpha)
@@ -473,54 +473,62 @@ void HeaderView::paint (juce::Graphics& g)
 
 void HeaderView::resized()
 {
+    // spacing on a 4 px grid: 8 inside a group, 16 between groups
+    constexpr int gapS = 8, gapL = 16;
     const int w = getWidth(), h = getHeight();
     const int inner = h - 2 * kPad;
-    const int gap = 6;
 
-    // quick-access grid: two rows when there is room, otherwise one row of the first buttons
-    const int rows = inner >= 92 ? 2 : 1;
-    const int tile = juce::jlimit (28, 48, (inner - gap * (rows - 1)) / rows);
+    // quick-access grid: secondary actions, so smaller than the transport (36 px tiles, 18 px icons)
+    const int rows = inner >= 2 * 32 + gapS ? 2 : 1;
+    const int tile = juce::jlimit (28, 36, (inner - gapS * (rows - 1)) / rows);
     const int cols = juce::jmax (1, quickColumns);
-    const int visible = juce::jmin ((int) quick.size(), cols * rows);
-    const int qw = cols * tile + (cols - 1) * gap;
-    const int qh = rows * tile + (rows - 1) * gap;
+    const int all = (int) quick.size();
+    // one row: show every button if they fit in a third of the width, otherwise the first row
+    const int perRow = rows == 2 ? cols : (all * (tile + gapS) <= w / 3 ? all : cols);
+    const int visible = juce::jmin (all, perRow * rows);
+    const int qw = perRow * tile + (perRow - 1) * gapS;
+    const int qh = rows * tile + (rows - 1) * gapS;
     const int qx = w - kPad - qw;
-    for (size_t i = 0; i < quick.size(); ++i)
+    for (int i = 0; i < all; ++i)
     {
-        const bool show = (int) i < visible;
-        quick[i]->setVisible (show);
+        const bool show = i < visible;
+        quick[(size_t) i]->setVisible (show);
         if (show)
-            quick[i]->setBounds (qx + ((int) i % cols) * (tile + gap), (h - qh) / 2 + ((int) i / cols) * (tile + gap), tile, tile);
+            quick[(size_t) i]->setBounds (qx + (i % perRow) * (tile + gapS), (h - qh) / 2 + (i / perRow) * (tile + gapS), tile, tile);
     }
 
-    // transport block (fixed size, scales a little with height)
-    const int playSize = juce::jlimit (34, 52, inner / 2 + 8);
-    const int sideSize = juce::roundToInt ((float) playSize * 0.72f);
-    const int repeatSize = juce::roundToInt ((float) playSize * 0.66f);
-    const int repeatGap = 10;
-    // the repeat slot is mirrored on the left (empty for now), so play stays in the middle of the block
-    const int transportW = sideSize * 2 + playSize + 2 * 14 + 2 * (repeatGap + repeatSize);
+    // transport: play, prev/next at 70 %, repeat at 64 %
+    const int playSize = juce::jlimit (36, 52, inner / 2 + 8);
+    const int sideSize = juce::roundToInt ((float) playSize * 0.70f);
+    const int repeatSize = juce::roundToInt ((float) playSize * 0.64f);
+    const int core = sideSize * 2 + playSize + 2 * gapL;           // prev, play, next
+    const int wing = gapS + repeatSize;                             // repeat on the right
+    const int textX = artArea().getRight() + gapL;
+    const int minText = 140, volIcon = 28;
 
-    // from the right: quick grid, volume, transport; the text takes what's left, never less than 120
-    const int textX = artArea().getRight() + 12;
-    int available = qx - 24 - textX;
-    int volW = juce::jlimit (0, 200, available - transportW - 140 - 40);
-    volume->iconOnly = volW < 90;
-    if (volume->iconOnly) volW = 28;
-    const int volX = qx - 20 - volW;
-    volume->setBounds (volX, h / 2 - 18, volW, 36);
+    // play sits in the middle of the window (under the title) whenever that leaves room for the text
+    // on the left and the volume icon on the right; otherwise it moves just as far as needed
+    const int leftLimit = textX + minText + gapL;
+    const int rightLimit = qx - gapL - volIcon - gapL - wing;      // right edge of the core
+    int coreX = (w - core) / 2;
+    coreX = juce::jmin (coreX, rightLimit - core);
+    coreX = juce::jmax (coreX, juce::jmin (leftLimit, rightLimit - core));
+    coreX = juce::jmax (coreX, textX);
 
-    const int textMax = juce::jmin (420, volX - 24 - transportW - 24 - textX);
-    const int textW = juce::jmax (120, textMax);
-    textBounds = { textX, kPad + 2, juce::jmax (0, juce::jmin (textW, volX - 24 - transportW - 12 - textX)), inner - 4 };
+    prevButton->setBounds (coreX, (h - sideSize) / 2, sideSize, sideSize);
+    playButton->setBounds (prevButton->getRight() + gapL, (h - playSize) / 2, playSize, playSize);
+    nextButton->setBounds (playButton->getRight() + gapL, (h - sideSize) / 2, sideSize, sideSize);
+    repeatButton->setBounds (nextButton->getRight() + gapS, (h - repeatSize) / 2, repeatSize, repeatSize);
 
-    const int transportLeft = textBounds.getRight() + 12;
-    const int transportRight = volX - 12;
-    const int transportX = juce::jmax (transportLeft, (transportLeft + transportRight - transportW) / 2);
-    prevButton->setBounds (transportX + repeatSize + repeatGap, (h - sideSize) / 2, sideSize, sideSize);
-    playButton->setBounds (prevButton->getRight() + 14, (h - playSize) / 2, playSize, playSize);
-    nextButton->setBounds (playButton->getRight() + 14, (h - sideSize) / 2, sideSize, sideSize);
-    repeatButton->setBounds (nextButton->getRight() + repeatGap, (h - repeatSize) / 2, repeatSize, repeatSize);
+    // volume: right-aligned before the grid, a full slider when there is room, else just the icon
+    const int volSpace = qx - gapL - (repeatButton->getRight() + gapL);
+    int volW = juce::jlimit (0, 180, volSpace);
+    volume->iconOnly = volW < 100;
+    if (volume->iconOnly) volW = volIcon;
+    volume->setBounds (qx - gapL - volW, h / 2 - 22, volW, 44);
+
+    // text gets everything left of the transport
+    textBounds = { textX, kPad + 2, juce::jmax (0, juce::jmin (420, coreX - gapL - textX)), inner - 4 };
 
     if (onLayoutChanged) onLayoutChanged();
 }
