@@ -97,11 +97,15 @@ public:
             g.drawText ((db > 0 ? "+" : "") + juce::String (db), Rectangle<float> (getLocalBounds().toFloat().getX() + 4, y - 7, 24, 14), juce::Justification::centredRight, false);
         }
         static const std::pair<float, const char*> freqs[] = { { 50, "50" }, { 100, "100" }, { 200, "200" }, { 500, "500" }, { 1000, "1k" }, { 2000, "2k" }, { 5000, "5k" }, { 10000, "10k" } };
+        float lastLabelRight = -1.0e6f;
         for (auto& [hz, txt] : freqs)
         {
             const float x = freqToX (hz);
             g.setColour (Colour (0xff5e5e5e));
             g.drawVerticalLine ((int) x, area.getY(), area.getBottom());
+            const float tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), txt);
+            if (x - tw * 0.5f < lastLabelRight + 4.0f) continue;   // crowded: skip this label
+            lastLabelRight = x + tw * 0.5f;
             g.setColour (Colour (0xffcfcfcf));
             g.drawText (txt, Rectangle<float> (x - 18, area.getBottom() + 2, 36, 13), juce::Justification::centred, false);
         }
@@ -356,7 +360,7 @@ public:
         g.fillRect (bar.withHeight (bar.getHeight() * frac));
         g.setColour (juce::Colours::white);
         g.setFont (theme::mono (10.0f));
-        g.drawText ("-" + juce::String (grShown.current, 1), meter.withTop (bar.getBottom() + 2), juce::Justification::centred, false);
+        g.drawText ("-" + juce::String (std::abs (grShown.current), 1), meter.withTop (bar.getBottom() + 2), juce::Justification::centred, false);
         plug::drawLabel (g, "GR", bar.withHeight (14).translated (0, -15), juce::Justification::centred, theme::label, 9.5f);
     }
 
@@ -456,10 +460,9 @@ public:
         // readouts next to the knobs
         auto info = getLocalBounds().toFloat().reduced (10, 8).removeFromBottom ((float) juce::jlimit (48, 68, getHeight() / 3));
         info = info.withTrimmedLeft (juce::jmin (90.0f, info.getWidth() / 4.0f) * 3.0f + 10.0f);
-        plug::drawLabel (g, "Gain reduction", info.removeFromTop (14), juce::Justification::centredLeft, Colour (0xffcfcfcf), 9.5f);
+        plug::drawLabel (g, info.getWidth() < 90.0f ? "GR" : "Gain reduction", info.removeFromTop (14), juce::Justification::centredLeft, Colour (0xffcfcfcf), 9.5f);
         g.setColour (grShown.current > 0.1f ? theme::accent : theme::text);
-        g.setFont (theme::mono (juce::jlimit (14.0f, 24.0f, info.getHeight() * 0.6f)));
-        g.drawText ("-" + juce::String (grShown.current, 1) + " dB", info, juce::Justification::centredLeft, false);
+        plug::drawValue (g, "-" + juce::String (std::abs (grShown.current), 1) + " dB", info, theme::mono (juce::jlimit (14.0f, 24.0f, info.getHeight() * 0.6f)), juce::Justification::centredLeft);
     }
 
 private:

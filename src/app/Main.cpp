@@ -2,6 +2,8 @@
 #include "media/Media.h"
 #include "VideoPlayer.h"
 #include "TaskbarPlayer.h"
+#include "MediaControls.h"
+#include "DocIcon.h"
 
 namespace tp
 {
@@ -79,11 +81,20 @@ public:
         taskbar->renderPreview = [this] (int w, int h) { return content->renderMiniPlayer (w, h); };
         taskbar->stateKey = [this] { return content->miniPlayerKey(); };
         taskbar->setEnabled (content->isTaskbarPlayerEnabled());
+
+        media = std::make_unique<MediaControls> (*this);
+        media->onPlayPause = [this] { content->togglePlayback(); };
+        media->onPlay = [this] { if (! content->isPlayingNow()) content->togglePlayback(); };
+        media->onPause = [this] { if (content->isPlayingNow()) content->togglePlayback(); };
+        media->onNext = [this] { content->nextTrack(); };
+        media->onPrev = [this] { content->previousTrack(); };
+        media->state = [this] { return content->nowPlaying(); };
         content->onTaskbarPlayerChanged = [this] (bool on) { taskbar->setEnabled (on); };
     }
 
     ~MainWindow() override
     {
+        media.reset();
         taskbar.reset();
         storeWindowState (getWindowStateAsString());
     }
@@ -148,6 +159,7 @@ private:
     MainComponent* content = nullptr;
     std::unique_ptr<juce::ResizableBorderComponent> edges;
     std::unique_ptr<TaskbarPlayer> taskbar;
+    std::unique_ptr<MediaControls> media;
 };
 
 //==============================================================================
@@ -264,12 +276,33 @@ int runSnapshot (const juce::StringArray& args)
         main->openPluginBrowser();
     if (args.contains ("--fullscreen"))
         main->setFullscreenVideo (true);
+    if (args.contains ("--repeat"))
+        main->setRepeat (value ("--repeat", "1").getIntValue());
 
     const int frames = (int) (60.0 * value ("--seconds", "4").getDoubleValue());
     for (int i = 0; i < frames; ++i)
     {
         main->getEngine().renderOffline (735);
         main->tickFrame (1.0f / 60.0f);
+    }
+
+    if (args.contains ("--bench"))
+    {
+        // frame cost while playing: analysis + plugin updates, and painting the whole window
+        double tickMs = 0.0, paintMs = 0.0;
+        const int n = 300;
+        for (int i = 0; i < n; ++i)
+        {
+            const auto t0 = juce::Time::getMillisecondCounterHiRes();
+            main->getEngine().renderOffline (735);
+            main->tickFrame (1.0f / 60.0f);
+            const auto t1 = juce::Time::getMillisecondCounterHiRes();
+            juce::ignoreUnused (main->createComponentSnapshot (main->getLocalBounds(), true, 1.0f));
+            const auto t2 = juce::Time::getMillisecondCounterHiRes();
+            tickMs += t1 - t0;
+            paintMs += t2 - t1;
+        }
+        std::printf ("bench: tick %.2f ms, paint %.2f ms per frame (%d frames)\n", tickMs / n, paintMs / n, n);
     }
 
     if (main->hasVideo() && ! main->syncVideoNow (8000))
@@ -280,6 +313,81 @@ int runSnapshot (const juce::StringArray& args)
     juce::FileOutputStream stream (out);
     juce::PNGImageFormat png;
     const bool ok = stream.openedOk() && png.writeImageToStream (img, stream);
+    std::printf ("%s %s\n", ok ? "wrote" : "FAILED", out.getFullPathName().toRawUTF8());
+    return ok ? 0 : 1;
+}
+
+/** --doc-icons out.png: the file-type icons in every colour of the menu, big and small, for review. */
+int runDocIcons (const juce::StringArray& args)
+{
+    const int i = args.indexOf ("--doc-icons");
+    const auto out = juce::File::getCurrentWorkingDirectory().getChildFile (i + 1 < args.size() ? args[i + 1].unquoted() : "doc-icons.png");
+    const int cell = 150, rows = (int) std::size (docicon::swatches);
+    const int sizes[] = { 16, 24, 32, 48, 64 };
+    juce::Image sheet (juce::Image::ARGB, cell * 4 + 40 + 230 * 2, rows * cell, true);
+    juce::Graphics g (sheet);
+    for (int half = 0; half < 2; ++half)
+    {
+        const int x0 = half * (sheet.getWidth() / 2);
+        g.setColour (half == 0 ? juce::Colour (0xffececec) : juce::Colour (0xff1e1e1e));
+        g.fillRect (x0, 0, sheet.getWidth() / 2, sheet.getHeight());
+        for (int r = 0; r < rows; ++r)
+        {
+            const juce::Colour page (docicon::swatches[r].argb);
+            g.drawImageAt (docicon::render ("mp3", false, page, 128), x0 + 10, r * cell + 10);
+            g.drawImageAt (docicon::render ("mp4", true, page, 128), x0 + 10 + cell, r * cell + 10);
+            int x = x0 + 20 + cell * 2;
+            for (int s : sizes)
+            {
+                g.drawImageAt (docicon::render ("flac", false, page, s), x, r * cell + 74 - s / 2);
+                x += s + 10;
+            }
+        }
+    }
+    out.deleteFile();
+    juce::FileOutputStream stream (out);
+    juce::PNGImageFormat png;
+    const bool ok = stream.openedOk() && png.writeImageToStream (sheet, stream);
+    std::printf ("%s %s\n", ok ? "wrote" : "FAILED", out.getFullPathName().toRawUTF8());
+    return ok ? 0 : 1;
+}
+
+/** --quick-icons out.png: every quick-access button as a 36 px tile, shown 3x, one row per monitor-icon design. */
+int runQuickIcons (const juce::StringArray& args)
+{
+    const int i = args.indexOf ("--quick-icons");
+    const auto out = juce::File::getCurrentWorkingDirectory().getChildFile (i + 1 < args.size() ? args[i + 1].unquoted() : "quick-icons.png");
+    const int z = 3, tile = 36, cell = (tile + 10) * z;
+    const auto& list = quickActions();
+    juce::Image sheet (juce::Image::ARGB, cell * 10, cell * 5, true);
+    juce::Graphics g (sheet);
+    g.fillAll (theme::header);
+    // rows 0-1: today; rows 2-3: proposal with the cleaned-up faders; row 4: monitor as headphones
+    for (int variant = 0; variant < 3; ++variant)
+    {
+        quickIconVariant() = variant;
+        for (size_t k = 0; k < list.size(); ++k)
+        {
+            if (variant == 2 && k > 0) break;
+            const int row = variant * 2 + (int) k / 10;
+            const int col = (int) k % 10;
+            juce::Graphics::ScopedSaveState s (g);
+            g.addTransform (juce::AffineTransform::scale ((float) z).translated ((float) (col * cell + 5 * z), (float) (row * cell + 5 * z)));
+            const auto r = juce::Rectangle<float> (0, 0, (float) tile, (float) tile);
+            g.setColour (juce::Colour (0xff424242));
+            g.fillRoundedRectangle (r, 5.0f);
+            g.setColour (juce::Colours::white.withAlpha (0.05f));
+            g.drawRoundedRectangle (r.reduced (0.5f), 5.0f, 1.0f);
+            const float kk = tile / 62.0f;
+            g.addTransform (juce::AffineTransform::scale (kk * 1.05f, kk * 1.05f, r.getCentreX(), r.getCentreY()));
+            drawQuickActionIcon (g, list[k].action, r, juce::Colour (0xff9e9e9e));
+        }
+    }
+    quickIconVariant() = 2;
+    out.deleteFile();
+    juce::FileOutputStream stream (out);
+    juce::PNGImageFormat png;
+    const bool ok = stream.openedOk() && png.writeImageToStream (sheet, stream);
     std::printf ("%s %s\n", ok ? "wrote" : "FAILED", out.getFullPathName().toRawUTF8());
     return ok ? 0 : 1;
 }
@@ -433,6 +541,18 @@ public:
             quit();
             return;
         }
+        if (args.contains ("--quick-icons"))
+        {
+            setApplicationReturnValue (runQuickIcons (args));
+            quit();
+            return;
+        }
+        if (args.contains ("--doc-icons"))
+        {
+            setApplicationReturnValue (runDocIcons (args));
+            quit();
+            return;
+        }
         if (args.contains ("--snapshot"))
         {
             setApplicationReturnValue (runSnapshot (args));
@@ -455,7 +575,12 @@ public:
     void anotherInstanceStarted (const juce::String& commandLine) override
     {
         openFromCommandLine (commandLine);
-        if (window != nullptr) window->toFront (true);
+        if (window != nullptr)
+        {
+            if (window->isMinimised()) window->setMinimised (false);
+            window->setVisible (true);
+            TaskbarPlayer::bringToFront (*window);
+        }
     }
 
 private:

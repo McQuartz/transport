@@ -7,15 +7,17 @@ using juce::Rectangle;
 using juce::Point;
 
 //==============================================================================
-class HeaderView::IconButton final : public juce::Component, public Animated
+class HeaderView::IconButton final : public juce::Component, public juce::SettableTooltipClient, public Animated
 {
 public:
-    enum class Kind { prev, play, next };
+    enum class Kind { prev, play, next, repeat, shuffle };
 
     explicit IconButton (Kind k) : kind (k) { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
 
     std::function<void()> onClick;
     void setPlaying (bool p) { morph.target = p ? 1.0f : 0.0f; }
+    void setRepeat (int m)   { repeatMode = m; morph.target = m > 0 ? 1.0f : 0.0f; repaint(); }
+    void setToggled (bool on) { morph.target = on ? 1.0f : 0.0f; repaint(); }
 
     void animate (float dt) override
     {
@@ -43,6 +45,43 @@ public:
         const auto c = b.getCentre();
         g.addTransform (juce::AffineTransform::translation (-boxW * 0.5f, -boxH * 0.5f).scaled (scale).translated (c.x, c.y));
 
+        if (kind == Kind::shuffle)
+        {
+            // two crossing arrows; accent when on
+            const auto base = theme::icon.interpolatedWith (theme::iconBright, state.hover.current * 0.75f);
+            g.setColour (base.interpolatedWith (theme::accent, morph.current));
+            juce::Path lines;
+            lines.startNewSubPath (4, 9);  lines.cubicTo (14, 9, 18, 25, 25, 25);
+            lines.startNewSubPath (4, 25); lines.cubicTo (10, 25, 12, 20, 14, 17.5f);
+            lines.startNewSubPath (19, 12); lines.cubicTo (21, 10, 22, 9, 25, 9);
+            g.strokePath (lines, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            juce::Path heads;
+            heads.addTriangle (24, 3.5f, 31, 9, 24, 14.5f);
+            heads.addTriangle (24, 19.5f, 31, 25, 24, 30.5f);
+            g.fillPath (heads);
+            return;
+        }
+        if (kind == Kind::repeat)
+        {
+            // two arrows chasing each other round a loop; accent when on, a "1" inside for repeat one
+            const auto base = theme::icon.interpolatedWith (theme::iconBright, state.hover.current * 0.75f);
+            g.setColour (base.interpolatedWith (theme::accent, morph.current));
+            juce::Path loop;
+            loop.startNewSubPath (6, 19); loop.lineTo (6, 14); loop.quadraticTo (6, 9, 11, 9); loop.lineTo (24, 9);
+            loop.startNewSubPath (28, 15); loop.lineTo (28, 20); loop.quadraticTo (28, 25, 23, 25); loop.lineTo (10, 25);
+            g.strokePath (loop, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            juce::Path heads;
+            heads.addTriangle (23, 3.5f, 30, 9, 23, 14.5f);
+            heads.addTriangle (11, 19.5f, 4, 25, 11, 30.5f);
+            g.fillPath (heads);
+            if (repeatMode == 2)
+            {
+                g.setFont (theme::font (9.0f, true));
+                g.drawText ("1", juce::Rectangle<float> (11, 11, 12, 12), juce::Justification::centred, false);
+            }
+            return;
+        }
+
         g.setColour (theme::icon.interpolatedWith (theme::iconBright, juce::jmax (state.hover.current * 0.75f, kind == Kind::play ? morph.current * 0.7f : 0.0f)));
         juce::Path p;
         if (kind == Kind::prev)      { p.addRectangle (3, 5, 4, 24); p.addTriangle (31, 5, 9, 17, 31, 29); }
@@ -69,6 +108,7 @@ private:
     Kind kind;
     HoverState state;
     Smoothed morph;
+    int repeatMode = 0;
 };
 
 //==============================================================================
@@ -114,7 +154,14 @@ public:
         spk.lineTo (12, cy + 8); spk.lineTo (6, cy + 3.5f); spk.lineTo (2, cy + 3.5f); spk.closeSubPath();
         g.setColour (theme::icon.interpolatedWith (theme::iconBright, hover.current * 0.5f));
         g.fillPath (spk);
-        for (int i = 0; i < 2; ++i)
+        if (value <= 0.0f)
+        {
+            // muted: a cross where the waves were
+            g.setColour (theme::icon.interpolatedWith (theme::iconBright, hover.current * 0.5f));
+            g.drawLine (15.5f, cy - 4.0f, 23.5f, cy + 4.0f, 1.6f);
+            g.drawLine (23.5f, cy - 4.0f, 15.5f, cy + 4.0f, 1.6f);
+        }
+        else for (int i = 0; i < 2; ++i)
         {
             const float a = juce::jlimit (0.0f, 1.0f, shown.current * 2.5f - (float) i * 0.9f);
             if (a <= 0.0f) continue;
@@ -157,7 +204,7 @@ public:
     }
 
 private:
-    float trackY() const { return (float) getHeight() * 0.62f; }
+    float trackY() const { return (float) getHeight() * 0.5f; }   // centred, so it lines up with the buttons
     Rectangle<float> trackArea() const { return getLocalBounds().toFloat().withTrimmedLeft (28).withTrimmedRight (8); }
     void setFromX (float x) { const auto t = trackArea(); setValue ((x - t.getX()) / t.getWidth(), true); }
     void toggleMute()
@@ -222,7 +269,7 @@ public:
         const auto iconColour = Colour (0xff9e9e9e).interpolatedWith (juce::Colours::white, state.hover.current * 0.5f)
                                                    .interpolatedWith (theme::accent, active.current);
         juce::Graphics::ScopedSaveState save (g);
-        g.addTransform (juce::AffineTransform::scale (k * 0.82f, k * 0.82f, r.getCentreX(), r.getCentreY()));
+        g.addTransform (juce::AffineTransform::scale (k * 1.05f, k * 1.05f, r.getCentreX(), r.getCentreY()));
         drawQuickActionIcon (g, action, r, iconColour);
     }
 
@@ -237,6 +284,14 @@ HeaderView::HeaderView()
     prevButton = std::make_unique<IconButton> (IconButton::Kind::prev);
     playButton = std::make_unique<IconButton> (IconButton::Kind::play);
     nextButton = std::make_unique<IconButton> (IconButton::Kind::next);
+    repeatButton = std::make_unique<IconButton> (IconButton::Kind::repeat);
+    repeatButton->onClick = [this] { if (onRepeat) onRepeat(); };
+    repeatButton->setTitle ("Repeat");
+    setRepeat (0);
+    shuffleButton = std::make_unique<IconButton> (IconButton::Kind::shuffle);
+    shuffleButton->onClick = [this] { if (onShuffle) onShuffle(); };
+    shuffleButton->setTitle ("Shuffle");
+    setShuffle (false);
     prevButton->onClick = [this] { if (onPrev) onPrev(); };
     playButton->onClick = [this] { if (onPlayPause) onPlayPause(); };
     nextButton->onClick = [this] { if (onNext) onNext(); };
@@ -247,7 +302,7 @@ HeaderView::HeaderView()
     volume = std::make_unique<VolumeSlider>();
     volume->onChange = [this] (float v) { if (onVolumeChanged) onVolumeChanged (v); };
 
-    for (auto* c : std::initializer_list<juce::Component*> { prevButton.get(), playButton.get(), nextButton.get(), volume.get() })
+    for (auto* c : std::initializer_list<juce::Component*> { prevButton.get(), playButton.get(), nextButton.get(), repeatButton.get(), shuffleButton.get(), volume.get() })
         addAndMakeVisible (c);
 
     artFade.snap (1.0f);
@@ -297,11 +352,23 @@ void HeaderView::setPlaying (bool p)
     playButton->setPlaying (p);
 }
 
+void HeaderView::setRepeat (int mode)
+{
+    repeatButton->setRepeat (mode);
+    repeatButton->setTooltip (mode == 0 ? "Repeat: off" : (mode == 1 ? "Repeat: all tracks in the folder" : "Repeat: this track"));
+}
+
+void HeaderView::setShuffle (bool on)
+{
+    shuffleButton->setToggled (on);
+    shuffleButton->setTooltip (on ? "Shuffle: on" : "Shuffle: off");
+}
+
 void HeaderView::setVolume (float v) { volume->setValue (v, false); }
 
 void HeaderView::setTimeLine (const juce::String& line)
 {
-    if (line != timeLine) { timeLine = line; repaint (textArea()); }
+    if (line != timeLine) { timeLine = line; repaint (textArea().expanded (0, 10)); }
 }
 
 void HeaderView::setQuickActions (const std::vector<QuickAction>& actions, int columns)
@@ -331,7 +398,7 @@ void HeaderView::setQuickActive (QuickAction a, bool active)
 
 void HeaderView::animate (float dt)
 {
-    for (auto* a : std::initializer_list<Animated*> { prevButton.get(), playButton.get(), nextButton.get(), volume.get() })
+    for (auto* a : std::initializer_list<Animated*> { prevButton.get(), playButton.get(), nextButton.get(), repeatButton.get(), shuffleButton.get(), volume.get() })
         a->animate (dt);
     for (auto& q : quick)
         q->animate (dt);
@@ -343,7 +410,7 @@ void HeaderView::animate (float dt)
         dirtyArt = true;
     }
     if (dirtyArt) repaint (artArea());
-    if (textFade.tick (dt, 9.0f)) repaint (textArea());
+    if (textFade.tick (dt, 9.0f)) repaint (textArea().expanded (0, 10));   // the text slides 8 px out of its box
 }
 
 void HeaderView::paintArt (juce::Graphics& g, Rectangle<float> r, const juce::Image& img, float alpha)
@@ -421,8 +488,10 @@ void HeaderView::paint (juce::Graphics& g)
         }
         else
         {
-            juce::String one = lines.joinIntoString (utf8 ("  \xc2\xb7  "));
-            if (withTime && timeLine.isNotEmpty()) one << utf8 ("  \xc2\xb7  ") << timeLine;
+            // the time comes first: when the line gets cut, the file details go, not the clock
+            juce::String one;
+            if (withTime && timeLine.isNotEmpty()) one << timeLine << utf8 ("  \xc2\xb7  ");
+            one << lines.joinIntoString (utf8 ("  \xc2\xb7  "));
             all.add (one);
         }
         float y = r.getBottom() - 15.0f * (float) all.size();
@@ -440,50 +509,63 @@ void HeaderView::paint (juce::Graphics& g)
 
 void HeaderView::resized()
 {
+    // spacing on a 4 px grid: 8 inside a group, 16 between groups
+    constexpr int gapS = 8, gapL = 16;
     const int w = getWidth(), h = getHeight();
     const int inner = h - 2 * kPad;
-    const int gap = 6;
 
-    // quick-access grid: two rows when there is room, otherwise one row of the first buttons
-    const int rows = inner >= 92 ? 2 : 1;
-    const int tile = juce::jlimit (28, 48, (inner - gap * (rows - 1)) / rows);
+    // quick-access grid: secondary actions, so smaller than the transport (36 px tiles, 18 px icons)
+    const int rows = inner >= 2 * 32 + gapS ? 2 : 1;
+    const int tile = juce::jlimit (28, 36, (inner - gapS * (rows - 1)) / rows);
     const int cols = juce::jmax (1, quickColumns);
-    const int visible = juce::jmin ((int) quick.size(), cols * rows);
-    const int qw = cols * tile + (cols - 1) * gap;
-    const int qh = rows * tile + (rows - 1) * gap;
+    const int all = (int) quick.size();
+    // one row: show every button if they fit in a third of the width, otherwise the first row
+    const int perRow = rows == 2 ? cols : (all * (tile + gapS) <= w / 3 ? all : cols);
+    const int visible = juce::jmin (all, perRow * rows);
+    const int qw = perRow * tile + (perRow - 1) * gapS;
+    const int qh = rows * tile + (rows - 1) * gapS;
     const int qx = w - kPad - qw;
-    for (size_t i = 0; i < quick.size(); ++i)
+    for (int i = 0; i < all; ++i)
     {
-        const bool show = (int) i < visible;
-        quick[i]->setVisible (show);
+        const bool show = i < visible;
+        quick[(size_t) i]->setVisible (show);
         if (show)
-            quick[i]->setBounds (qx + ((int) i % cols) * (tile + gap), (h - qh) / 2 + ((int) i / cols) * (tile + gap), tile, tile);
+            quick[(size_t) i]->setBounds (qx + (i % perRow) * (tile + gapS), (h - qh) / 2 + (i / perRow) * (tile + gapS), tile, tile);
     }
 
-    // transport block (fixed size, scales a little with height)
-    const int playSize = juce::jlimit (34, 52, inner / 2 + 8);
-    const int sideSize = juce::roundToInt ((float) playSize * 0.72f);
-    const int transportW = sideSize * 2 + playSize + 2 * 14;
+    // transport: play, prev/next at 70 %, repeat at 64 %
+    const int playSize = juce::jlimit (36, 52, inner / 2 + 8);
+    const int sideSize = juce::roundToInt ((float) playSize * 0.70f);
+    const int repeatSize = juce::roundToInt ((float) playSize * 0.64f);
+    const int core = sideSize * 2 + playSize + 2 * gapL;           // prev, play, next
+    const int wing = gapS + repeatSize;                             // repeat on the right
+    const int textX = artArea().getRight() + gapL;
+    const int minText = 140, volIcon = 28;
 
-    // from the right: quick grid, volume, transport; the text takes what's left, never less than 120
-    const int textX = artArea().getRight() + 12;
-    int available = qx - 24 - textX;
-    int volW = juce::jlimit (0, 200, available - transportW - 140 - 40);
-    volume->iconOnly = volW < 90;
-    if (volume->iconOnly) volW = 28;
-    const int volX = qx - 20 - volW;
-    volume->setBounds (volX, h / 2 - 18, volW, 36);
+    // play sits in the middle of the window (under the title) whenever that leaves room for the text
+    // on the left and the volume icon on the right; otherwise it moves just as far as needed
+    const int leftLimit = textX + minText + gapL + wing;           // shuffle sits left of prev
+    const int rightLimit = qx - gapL - volIcon - gapL - wing;      // right edge of the core
+    int coreX = (w - core) / 2;
+    coreX = juce::jmin (coreX, rightLimit - core);
+    coreX = juce::jmax (coreX, juce::jmin (leftLimit, rightLimit - core));
+    coreX = juce::jmax (coreX, textX + wing);
 
-    const int textMax = juce::jmin (420, volX - 24 - transportW - 24 - textX);
-    const int textW = juce::jmax (120, textMax);
-    textBounds = { textX, kPad + 2, juce::jmax (0, juce::jmin (textW, volX - 24 - transportW - 12 - textX)), inner - 4 };
+    prevButton->setBounds (coreX, (h - sideSize) / 2, sideSize, sideSize);
+    playButton->setBounds (prevButton->getRight() + gapL, (h - playSize) / 2, playSize, playSize);
+    nextButton->setBounds (playButton->getRight() + gapL, (h - sideSize) / 2, sideSize, sideSize);
+    repeatButton->setBounds (nextButton->getRight() + gapS, (h - repeatSize) / 2, repeatSize, repeatSize);
+    shuffleButton->setBounds (coreX - gapS - repeatSize, (h - repeatSize) / 2, repeatSize, repeatSize);
 
-    const int transportLeft = textBounds.getRight() + 12;
-    const int transportRight = volX - 12;
-    const int transportX = juce::jmax (transportLeft, (transportLeft + transportRight - transportW) / 2);
-    prevButton->setBounds (transportX, (h - sideSize) / 2, sideSize, sideSize);
-    playButton->setBounds (prevButton->getRight() + 14, (h - playSize) / 2, playSize, playSize);
-    nextButton->setBounds (playButton->getRight() + 14, (h - sideSize) / 2, sideSize, sideSize);
+    // volume: right-aligned before the grid, a full slider when there is room, else just the icon
+    const int volSpace = qx - gapL - (repeatButton->getRight() + gapL);
+    int volW = juce::jlimit (0, 180, volSpace);
+    volume->iconOnly = volW < 100;
+    if (volume->iconOnly) volW = volIcon;
+    volume->setBounds (qx - gapL - volW, h / 2 - 22, volW, 44);
+
+    // text gets everything left of the transport
+    textBounds = { textX, kPad + 2, juce::jmax (0, juce::jmin (420, shuffleButton->getX() - gapL - textX)), inner - 4 };
 
     if (onLayoutChanged) onLayoutChanged();
 }
@@ -492,5 +574,11 @@ void HeaderView::mouseUp (const juce::MouseEvent& e)
 {
     if (artArea().contains (e.getPosition()) && onOpen)
         onOpen();
+    // the clock is always on the bottom line of the text: click switches elapsed / remaining
+    else if (textBounds.withTrimmedTop (textBounds.getHeight() - 16).contains (e.getPosition()) && timeLine.isNotEmpty() && onTimeClicked)
+    {
+        onTimeClicked();
+        repaint (textArea().expanded (0, 10));
+    }
 }
 } // namespace tp

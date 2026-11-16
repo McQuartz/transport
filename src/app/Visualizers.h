@@ -81,5 +81,8 @@ float bandEdge (int i, int n, float lo = 20.0f, float hi = 20000.0f);
 juce::String formatDb (float v, int decimals = 1);
 void drawLabel (juce::Graphics& g, const juce::String& t, juce::Rectangle<float> r,
                 juce::Justification j = juce::Justification::centredLeft, juce::Colour c = theme::label, float px = 10.0f);
+/** A measured value in font `f`, shrunk until it fits: never cut. */
+void drawValue (juce::Graphics& g, const juce::String& t, juce::Rectangle<float> r, juce::Font f,
+                juce::Justification j = juce::Justification::centredLeft);
 }
 } // namespace tp

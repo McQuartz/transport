@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Theme.h"
+#include <cstring>
 
 namespace tp
 {
@@ -61,6 +62,10 @@ inline QuickAction actionFromId (const juce::String& id, QuickAction fallback)
     return fallback;
 }
 
+/** Which icon set to draw: 0 = the original set, 1 = new set with faders, 2 = new set with headphones
+    (shipped). Kept so --quick-icons can show the designs side by side. */
+inline int& quickIconVariant() { static int v = 2; return v; }   // 2 = the current set (headphones)
+
 /** Draws the button glyph. Icons for the prototype's four buttons, compact monograms for the rest. */
 inline void drawQuickActionIcon (juce::Graphics& g, QuickAction a, juce::Rectangle<float> r, juce::Colour c)
 {
@@ -68,26 +73,55 @@ inline void drawQuickActionIcon (juce::Graphics& g, QuickAction a, juce::Rectang
     g.setColour (c);
     juce::Path p;
 
+    const bool proposal = quickIconVariant() > 0;
     auto monogram = [&] (const char* text, float px = 12.0f)
     {
+        // proposal: every letter label the same size and weight, so they read as one family
+        if (proposal) px = std::strlen (text) == 1 ? 17.0f : 13.0f;
         g.setFont (theme::mono (px));
         g.drawText (utf8 (text), r, juce::Justification::centred, false);
     };
 
     switch (a)
     {
-        case QuickAction::monitor:   // three faders
+        case QuickAction::monitor:
         {
-            const float knobs[] = { 18.0f, 22.0f, 8.0f };
-            for (int i = 0; i < 3; ++i)
+            // 0 = the original (knobs filled with the tile colour), 1 = cleaned-up faders (solid caps, track
+            // broken around them, like the Dim knob), 2 = headphones
+            if (quickIconVariant() == 0)
             {
-                const float x = centre.x - 10.0f + (float) i * 10.0f;
-                g.drawLine (x, centre.y - 14, x, centre.y + 14, 1.8f);
-                auto knob = juce::Rectangle<float> (8, 5).withCentre ({ x, centre.y - 14 + knobs[i] + 2.5f - 6.0f });
-                g.setColour (theme::button);
-                g.fillRect (knob);
-                g.setColour (c);
-                g.drawRect (knob, 1.6f);
+                const float knobs[] = { 18.0f, 22.0f, 8.0f };
+                for (int i = 0; i < 3; ++i)
+                {
+                    const float x = centre.x - 10.0f + (float) i * 10.0f;
+                    g.drawLine (x, centre.y - 14, x, centre.y + 14, 1.8f);
+                    auto knob = juce::Rectangle<float> (8, 5).withCentre ({ x, centre.y - 14 + knobs[i] + 2.5f - 6.0f });
+                    g.setColour (theme::button);
+                    g.fillRect (knob);
+                    g.setColour (c);
+                    g.drawRect (knob, 1.6f);
+                }
+            }
+            else if (quickIconVariant() == 1)
+            {
+                const float caps[] = { 4.0f, -6.0f, 7.0f };
+                for (int i = 0; i < 3; ++i)
+                {
+                    const float x = centre.x - 11.0f + (float) i * 11.0f, y = centre.y + caps[i];
+                    juce::Path track;
+                    track.startNewSubPath (x, centre.y - 14); track.lineTo (x, y - 6.5f);
+                    track.startNewSubPath (x, y + 6.5f);      track.lineTo (x, centre.y + 14);
+                    g.strokePath (track, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                    g.fillRoundedRectangle (juce::Rectangle<float> (9.0f, 8.0f).withCentre ({ x, y }), 2.5f);
+                }
+            }
+            else
+            {
+                juce::Path band;
+                band.addCentredArc (centre.x, centre.y + 2, 13, 13, 0, -1.75f, 1.75f, true);
+                g.strokePath (band, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                g.fillRoundedRectangle (centre.x - 15.5f, centre.y + 1, 7.5f, 13, 3.0f);
+                g.fillRoundedRectangle (centre.x + 8.0f,  centre.y + 1, 7.5f, 13, 3.0f);
             }
             break;
         }
@@ -98,8 +132,14 @@ inline void drawQuickActionIcon (juce::Graphics& g, QuickAction a, juce::Rectang
         case QuickAction::addVisualizer:
         {
             const float h[] = { 10, 14, 18, 15, 22 };
-            for (int i = 0; i < 5; ++i)
-                g.fillRect (juce::Rectangle<float> (centre.x - 16.0f + (float) i * 6.5f, centre.y + 11.0f - h[i], 5.0f, h[i]));
+            const int n = proposal ? 3 : 5;
+            for (int i = 0; i < n; ++i)
+                g.fillRect (juce::Rectangle<float> (centre.x - (proposal ? 18.0f : 16.0f) + (float) i * 6.5f, centre.y + 11.0f - h[i], 5.0f, h[i]));
+            if (proposal)   // bars + a plus: "add a meter"
+            {
+                g.drawLine (centre.x + 11.0f, centre.y - 5.0f, centre.x + 11.0f, centre.y + 9.0f, 2.2f);
+                g.drawLine (centre.x + 4.0f, centre.y + 2.0f, centre.x + 18.0f, centre.y + 2.0f, 2.2f);
+            }
             break;
         }
         case QuickAction::dim:   // the knob
@@ -116,7 +156,10 @@ inline void drawQuickActionIcon (juce::Graphics& g, QuickAction a, juce::Rectang
             p.lineTo (centre.x + 15, centre.y + 11); p.lineTo (centre.x - 15, centre.y + 11); p.closeSubPath();
             g.strokePath (p, juce::PathStrokeType (1.8f, juce::PathStrokeType::mitered));
             break;
-        case QuickAction::mono:      g.drawEllipse (juce::Rectangle<float> (22, 22).withCentre (centre), 2.0f); break;
+        case QuickAction::mono:
+            if (proposal) monogram ("MONO");   // a bare circle reads as "record"
+            else g.drawEllipse (juce::Rectangle<float> (22, 22).withCentre (centre), 2.0f);
+            break;
         case QuickAction::swap:
             p.startNewSubPath (centre.x - 13, centre.y - 5); p.lineTo (centre.x + 13, centre.y - 5);
             p.startNewSubPath (centre.x + 7, centre.y - 11); p.lineTo (centre.x + 13, centre.y - 5); p.lineTo (centre.x + 7, centre.y + 1);
@@ -131,6 +174,16 @@ inline void drawQuickActionIcon (juce::Graphics& g, QuickAction a, juce::Rectang
         case QuickAction::bypass:    monogram ("BYP"); break;
         case QuickAction::abLoop:    monogram ("A\xe2\x80\x93" "B", 13); break;
         case QuickAction::alwaysOnTop:
+            if (proposal)   // a pin, the usual sign for "keep on top"
+            {
+                p.startNewSubPath (centre.x - 6, centre.y - 13); p.lineTo (centre.x + 6, centre.y - 13);
+                p.startNewSubPath (centre.x - 4, centre.y - 13); p.lineTo (centre.x - 4, centre.y - 3);
+                p.lineTo (centre.x - 9, centre.y + 3); p.lineTo (centre.x + 9, centre.y + 3); p.lineTo (centre.x + 4, centre.y - 3);
+                p.lineTo (centre.x + 4, centre.y - 13);
+                p.startNewSubPath (centre.x, centre.y + 3); p.lineTo (centre.x, centre.y + 14);
+                g.strokePath (p, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                break;
+            }
             p.addRectangle (centre.x - 13, centre.y - 13, 26, 4);
             p.startNewSubPath (centre.x, centre.y - 7); p.lineTo (centre.x, centre.y + 13);
             p.startNewSubPath (centre.x - 7, centre.y); p.lineTo (centre.x, centre.y - 7); p.lineTo (centre.x + 7, centre.y);
