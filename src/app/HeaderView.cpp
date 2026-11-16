@@ -87,15 +87,28 @@ public:
         {
             const int st = tp::style();
             const auto ring = juce::Rectangle<float> (-2.0f, 0.0f, 50.0f, 50.0f);
-            if (st == 2)
-            {
-                g.drawEllipse (ring.reduced (1.0f), 2.0f);
-                g.addTransform (juce::AffineTransform::scale (0.62f, 0.62f, 23.0f, 25.0f));
-            }
-            else if (st == 3)
+            if (false) {}
+            else if (st == 3 && tp::headerVariant() == 0)
             {
                 g.drawRoundedRectangle (ring.reduced (2.0f), 8.0f, 2.0f);
                 g.addTransform (juce::AffineTransform::scale (0.6f, 0.6f, 23.0f, 25.0f));
+            }
+            if (tp::headerVariant() == 3)
+            {
+                g.drawEllipse (ring.reduced (1.0f), 1.5f);
+                g.addTransform (juce::AffineTransform::scale (0.5f, 0.5f, 23.0f, 25.0f).translated (morph.current > 0.5f ? 0.0f : 2.0f, 0.0f));
+            }
+            else if (tp::headerVariant() == 4)
+            {
+                g.setColour (tp::C (0xff626262).interpolatedWith (tp::C (0xff6e6e6e), state.hover.current));
+                g.fillRoundedRectangle (ring, 9.0f);
+                g.setColour (juce::Colours::white);
+                g.addTransform (juce::AffineTransform::scale (0.5f, 0.5f, 23.0f, 25.0f).translated (morph.current > 0.5f ? 0.0f : 2.0f, 0.0f));
+            }
+            else if (st == 2)
+            {
+                g.drawEllipse (ring.reduced (1.0f), 2.0f);
+                g.addTransform (juce::AffineTransform::scale (0.62f, 0.62f, 23.0f, 25.0f));
             }
             else if (st == 4)
             {
@@ -195,7 +208,44 @@ public:
         }
         if (iconOnly) return;
 
+        const int hv = tp::headerVariant();
         const auto track = trackArea();
+        if (hv == 3 || hv == 4)
+        {
+            // readout always visible on the right
+            const float db = value <= 0.0f ? -100.0f : 40.0f * std::log10 (value);
+            g.setColour (theme::label);
+            g.setFont (theme::mono (10.5f, false));
+            g.drawText (value <= 0.0f ? utf8 ("\xe2\x88\x92\xe2\x88\x9e dB") : juce::String (db, 1) + " dB",
+                        Rectangle<float> (track.getRight() + 8.0f, cy - 8.0f, 56.0f, 16.0f), juce::Justification::centredLeft, false);
+            const float th = hv == 3 ? 1.5f : 4.0f;
+            const auto line = Rectangle<float> (track.getX(), cy - th * 0.5f, track.getWidth(), th);
+            g.setColour (tp::C (0xff595959));
+            g.fillRect (line);
+            g.setColour (tp::C (0xffdedede));
+            g.fillRect (line.withWidth (line.getWidth() * shown.current));
+            const float x = line.getX() + line.getWidth() * shown.current;
+            if (hv == 4)
+            {
+                g.setColour (tp::C (0xff6a6a6a));
+                for (int i = 0; i <= 10; ++i)
+                {
+                    const float tx = line.getX() + line.getWidth() * (float) i / 10.0f;
+                    g.fillRect (tx - 0.5f, cy + 7.0f, 1.0f, i % 5 == 0 ? 6.0f : 3.0f);
+                }
+                const auto cap = Rectangle<float> (10.0f, 22.0f).withCentre ({ x, cy });
+                g.setColour (tp::C (0xffcfcfcf).interpolatedWith (juce::Colours::white, hover.current));
+                g.fillRoundedRectangle (cap, 2.0f);
+                g.setColour (tp::C (0xff2a2a2a));
+                g.fillRect (cap.withSizeKeepingCentre (cap.getWidth(), 1.5f));
+            }
+            else
+            {
+                g.setColour (juce::Colours::white);
+                g.fillRect (Rectangle<float> (3.0f, 18.0f).withCentre ({ x, cy }));
+            }
+            return;
+        }
         const float th = 3.0f + hover.current * 1.0f;
         const auto line = Rectangle<float> (track.getX(), cy - th * 0.5f, track.getWidth(), th);
         g.setColour (tp::C (0xff595959));
@@ -227,7 +277,7 @@ public:
 
 private:
     float trackY() const { return (float) getHeight() * 0.5f; }   // centred, so it lines up with the buttons
-    Rectangle<float> trackArea() const { return getLocalBounds().toFloat().withTrimmedLeft (28).withTrimmedRight (8); }
+    Rectangle<float> trackArea() const { return getLocalBounds().toFloat().withTrimmedLeft (28).withTrimmedRight (tp::headerVariant() >= 3 ? 70 : 8); }
     void setFromX (float x) { const auto t = trackArea(); setValue ((x - t.getX()) / t.getWidth(), true); }
     void toggleMute()
     {
@@ -500,7 +550,7 @@ void HeaderView::paint (juce::Graphics& g)
             g.drawText (a, r.withTrimmedTop (titlePx * 1.45f).withHeight (titlePx * 1.2f), juce::Justification::topLeft, true);
         }
 
-        g.setFont (tp::style() == 1 || tp::style() == 2 ? theme::mono (10.5f, false) : theme::font (11.0f));
+        g.setFont (tp::studio() || tp::style() == 2 ? theme::mono (10.5f, false) : theme::font (11.0f));
         g.setColour (tp::C (0xffb8b8b8).withAlpha (alpha));
         juce::StringArray all;
         if (roomy)
@@ -524,9 +574,33 @@ void HeaderView::paint (juce::Graphics& g)
         }
     };
 
+    const int hv = tp::headerVariant();
+    if (hv == 1)
+    {
+        // transport block: one recessed capsule holding shuffle .. repeat
+        auto cap = Rectangle<float> ((float) shuffleButton->getX() - 12.0f, (float) playButton->getY() - 4.0f,
+                                     (float) (repeatButton->getRight() - shuffleButton->getX()) + 24.0f, (float) playButton->getHeight() + 8.0f);
+        g.setColour (tp::C (0xff2a2a2a));
+        g.fillRoundedRectangle (cap, cap.getHeight() * 0.5f);
+        g.setColour (tp::C (0xff505050));
+        g.drawRoundedRectangle (cap.reduced (0.5f), cap.getHeight() * 0.5f, 1.0f);
+    }
+    if (hv == 2 && ! bigTime.isEmpty() && timeLine.isNotEmpty())
+    {
+        const auto now = timeLine.upToFirstOccurrenceOf (" / ", false, false);
+        const auto len = timeLine.fromFirstOccurrenceOf (" / ", false, false);
+        auto r = bigTime.toFloat();
+        g.setColour (theme::text);
+        g.setFont (theme::mono (19.0f, false));
+        g.drawText (now, r.withTrimmedBottom (14.0f), juce::Justification::centredLeft, false);
+        g.setColour (theme::textDim);
+        g.setFont (theme::mono (10.0f, false));
+        g.drawText (utf8 ("von ") + len, r.withTrimmedTop (r.getHeight() - 14.0f), juce::Justification::centredLeft, false);
+    }
+
     const float t = easeOutCubic (textFade.current);
     drawText (previousTitle, previousArtist, previousMeta, 1.0f - t, -8.0f * t, false);
-    drawText (title, artist, meta, t, 8.0f * (1.0f - t), true);
+    drawText (title, artist, meta, t, 8.0f * (1.0f - t), hv != 2 || bigTime.isEmpty());
 }
 
 void HeaderView::resized()
@@ -581,10 +655,28 @@ void HeaderView::resized()
 
     // volume: right-aligned before the grid, a full slider when there is room, else just the icon
     const int volSpace = qx - gapL - (repeatButton->getRight() + gapL);
+    if (tp::headerVariant() > 0)
+    {
+        // mockup: the volume sits centred in the space between transport and quick buttons, and longer
+        int left = repeatButton->getRight() + 2 * gapL, right = qx - 2 * gapL;
+        bigTime = {};
+        if (tp::headerVariant() == 2 && right - left > 360)
+        {
+            bigTime = { left, h / 2 - 22, 150, 44 };
+            left += 150 + gapL;
+        }
+        int volW2 = juce::jlimit (0, tp::headerVariant() >= 3 ? 320 : 260, right - left);
+        volume->iconOnly = volW2 < 100;
+        if (volume->iconOnly) volW2 = volIcon;
+        volume->setBounds (left + (right - left - volW2) / 2, h / 2 - 22, volW2, 44);
+    }
+    else
+    {
     int volW = juce::jlimit (0, 180, volSpace);
     volume->iconOnly = volW < 100;
     if (volume->iconOnly) volW = volIcon;
     volume->setBounds (qx - gapL - volW, h / 2 - 22, volW, 44);
+    }
 
     // text gets everything left of the transport
     textBounds = { textX, kPad + 2, juce::jmax (0, juce::jmin (420, shuffleButton->getX() - gapL - textX)), inner - 4 };

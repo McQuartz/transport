@@ -57,6 +57,7 @@ private:
     std::vector<std::unique_ptr<QuickButton>> quick;
     int quickColumns = 2;
     juce::Rectangle<int> textBounds;
+    juce::Rectangle<int> bigTime;   // mockup: header variant 2
 
     juce::Image cover, previousCover;
     Smoothed artFade;

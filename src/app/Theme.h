@@ -28,6 +28,16 @@ inline int style()
     return s;
 }
 
+/** MOCKUP ONLY: TP_HEADER=1..4 picks a header variant. */
+inline int headerVariant()
+{
+    static const int h = [] { const char* e = std::getenv ("TP_HEADER"); return e ? std::atoi (e) : 0; }();
+    return h;
+}
+
+/** Styles 1 and 6 share the studio-black structure. */
+inline bool studio() { return style() == 1 || style() == 6; }
+
 /** Maps the current neutral grey ramp + amber accent onto the chosen style's palette. */
 inline juce::Colour C (juce::uint32 argb)
 {
@@ -49,8 +59,10 @@ inline juce::Colour C (juce::uint32 argb)
         { {0,0xff000000},{255,0xffffffff} },
         // 5 Eine Flaeche: everything on one surface, hairlines between
         { {0,0xff000000},{27,0xff0e0e10},{42,0xff17171a},{56,0xff1d1d20},{62,0xff1d1d20},{75,0xff1d1d20},{86,0xff1d1d20},{99,0xff2e2e33},{120,0xff45454b},{140,0xff76767f},{180,0xffadadb5},{212,0xffd8d8de},{255,0xffffffff} },
+        // 6 Studio-Schwarz, softer: dark graphite instead of black
+        { {0,0xff000000},{27,0xff101012},{42,0xff19191c},{56,0xff1e1e21},{62,0xff161618},{75,0xff1c1c1f},{86,0xff222225},{99,0xff2f2f33},{120,0xff45454b},{140,0xff7a7a82},{180,0xffb0b0b7},{212,0xffd8d8dc},{255,0xffffffff} },
     };
-    static const juce::uint32 accents[] = { 0xffe8a33a, 0xffff5a1f, 0xffff7a2e, 0xffe8582e, 0xffff6a2b, 0xffff6a1f };
+    static const juce::uint32 accents[] = { 0xffe8a33a, 0xffff5a1f, 0xffff7a2e, 0xffe8582e, 0xffff6a2b, 0xffff6a1f, 0xffff6526 };
 
     const float r = in.getFloatRed(), g = in.getFloatGreen(), b = in.getFloatBlue();
     const float mx = juce::jmax (r, g, b), mn = juce::jmin (r, g, b);

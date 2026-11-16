@@ -252,15 +252,15 @@ public:
     {
         const int st = tp::style();
         const auto r = getLocalBounds().toFloat();
-        const float radius = st == 1 ? 0.0f : st == 2 ? 2.0f : st == 3 ? 4.0f : st == 4 ? 12.0f : st == 5 ? 0.0f : 3.0f;
+        const float radius = tp::studio() ? 2.0f : st == 1 ? 0.0f : st == 2 ? 2.0f : st == 3 ? 4.0f : st == 4 ? 12.0f : st == 5 ? 0.0f : 3.0f;
         if (st != 5)
         {
             g.setColour (theme::panel.interpolatedWith (theme::panelHover, hover.current * 0.35f));
             g.fillRoundedRectangle (r, radius);
         }
-        if (st == 1)
+        if (tp::studio())
         {
-            g.setColour (tp::C (0xff626262));
+            g.setColour (tp::C (0xff5a5a5a));
             g.drawRect (r, 1.0f);
         }
         else if (st == 3)

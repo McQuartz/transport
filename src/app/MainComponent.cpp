@@ -587,7 +587,7 @@ void MainComponent::paint (juce::Graphics& g)
 
 void MainComponent::paintOverChildren (juce::Graphics& g)
 {
-    if (tp::style() == 1 || tp::style() == 5 || tp::style() == 3)
+    if (tp::studio() || tp::style() == 5 || tp::style() == 3)
     {
         g.setColour (tp::style() == 3 ? juce::Colours::black.withAlpha (0.5f) : tp::C (0xff707070));
         g.fillRect (0, header.getBottom() - 1, getWidth(), 1);
