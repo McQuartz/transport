@@ -28,7 +28,7 @@ FONT = next(p for p in FONT_PATHS if os.path.exists(p))
 PAGE = (38, 38, 38, 255)        # the player's dark surfaces
 FOLD = (70, 70, 70, 255)
 TEXT = (255, 255, 255, 255)
-ACCENT = (232, 163, 58, 255)    # theme::accent
+ACCENT = (255, 101, 38, 255)    # theme::accent #ff6526
 VIDEO_ACCENT = (232, 163, 58, 255)
 DIM = (140, 140, 140, 255)
 

@@ -83,6 +83,8 @@ public:
         }
 
         g.setColour (theme::icon.interpolatedWith (theme::iconBright, juce::jmax (state.hover.current * 0.75f, kind == Kind::play ? morph.current * 0.7f : 0.0f)));
+        if (kind == Kind::play)   // a touch smaller than its box, so it weighs about like prev/next
+            g.addTransform (juce::AffineTransform::scale (0.74f, 0.74f, 23.0f, 25.0f));
         juce::Path p;
         if (kind == Kind::prev)      { p.addRectangle (3, 5, 4, 24); p.addTriangle (31, 5, 9, 17, 31, 29); }
         else if (kind == Kind::next) { p.addTriangle (3, 5, 25, 17, 3, 29); p.addRectangle (27, 5, 4, 24); }
@@ -173,39 +175,30 @@ public:
         }
         if (iconOnly) return;
 
+        // a thin line with a vertical mark as the handle; the level in dB always reads on the right
         const auto track = trackArea();
-        const float th = 3.0f + hover.current * 1.0f;
+        const float th = 1.5f + hover.current * 0.5f;
         const auto line = Rectangle<float> (track.getX(), cy - th * 0.5f, track.getWidth(), th);
-        g.setColour (Colour (0xff595959));
-        g.fillRoundedRectangle (line, th * 0.5f);
-        g.setColour (Colour (0xffdedede));
-        g.fillRoundedRectangle (line.withWidth (line.getWidth() * shown.current), th * 0.5f);
-
-        const float r = 5.5f + hover.current * 1.5f + drag.current;
-        const Point<float> thumb (line.getX() + line.getWidth() * shown.current, cy);
-        if (drag.current > 0.01f)
-        {
-            g.setColour (juce::Colours::white.withAlpha (0.12f * drag.current));
-            g.fillEllipse (Rectangle<float> (r * 3.2f, r * 3.2f).withCentre (thumb));
-        }
+        g.setColour (theme::buttonHover);
+        g.fillRect (line);
+        g.setColour (theme::iconBright);
+        g.fillRect (line.withWidth (line.getWidth() * shown.current));
+        const float x = line.getX() + line.getWidth() * shown.current;
         g.setColour (juce::Colours::white);
-        g.fillEllipse (Rectangle<float> (r * 2, r * 2).withCentre (thumb));
+        g.fillRect (Rectangle<float> (3.0f + drag.current, 18.0f + 2.0f * hover.current).withCentre ({ x, cy }));
 
-        // value label sits fully inside the component, above the track
-        const float a = juce::jmax (hover.current, drag.current);
-        if (a > 0.01f)
-        {
-            g.setColour (theme::label.withAlpha (a));
-            g.setFont (theme::mono (10.0f, false));
-            g.drawText (juce::String (juce::roundToInt (value * 100.0f)) + "%",
-                        Rectangle<float> (juce::jlimit (0.0f, (float) getWidth() - 40.0f, thumb.x - 20.0f), 0.0f, 40.0f, cy - 9.0f),
-                        juce::Justification::centredBottom, false);
-        }
+        // gain is value squared (AudioEngine), so dB = 40 log10 (value)
+        g.setColour (theme::label.interpolatedWith (juce::Colours::white, juce::jmax (hover.current, drag.current)));
+        g.setFont (theme::mono (10.5f, false));
+        g.drawText (value <= 0.0f ? utf8 ("\xe2\x88\x92\xe2\x88\x9e dB") : juce::String (40.0f * std::log10 (value), 1) + " dB",
+                    Rectangle<float> (track.getRight() + 10.0f, cy - 8.0f, (float) kReadout - 10.0f, 16.0f),
+                    juce::Justification::centredLeft, false);
     }
 
 private:
     float trackY() const { return (float) getHeight() * 0.5f; }   // centred, so it lines up with the buttons
-    Rectangle<float> trackArea() const { return getLocalBounds().toFloat().withTrimmedLeft (28).withTrimmedRight (8); }
+    static constexpr int kReadout = 64;   // room for "-12.3 dB" right of the line
+    Rectangle<float> trackArea() const { return getLocalBounds().toFloat().withTrimmedLeft (28).withTrimmedRight ((float) kReadout); }
     void setFromX (float x) { const auto t = trackArea(); setValue ((x - t.getX()) / t.getWidth(), true); }
     void toggleMute()
     {
@@ -254,7 +247,7 @@ public:
         const float s = 1.0f - 0.04f * state.press.current;
         r = r.withSizeKeepingCentre (r.getWidth() * s, r.getHeight() * s);
 
-        g.setColour (Colour (0xff424242).interpolatedWith (Colour (0xff4d4d4d), state.hover.current));
+        g.setColour (Colour (0xff18181a).interpolatedWith (Colour (0xff1d1d20), state.hover.current));
         g.fillRoundedRectangle (r, 5.0f);
         g.setColour (juce::Colours::white.withAlpha (0.05f + 0.04f * state.hover.current));
         g.drawRoundedRectangle (r.reduced (0.5f), 5.0f, 1.0f);
@@ -266,7 +259,7 @@ public:
 
         // icons are drawn for a ~60px tile; scale them to this tile
         const float k = juce::jmin (r.getWidth(), r.getHeight()) / 62.0f;
-        const auto iconColour = Colour (0xff9e9e9e).interpolatedWith (juce::Colours::white, state.hover.current * 0.5f)
+        const auto iconColour = Colour (0xff92929a).interpolatedWith (juce::Colours::white, state.hover.current * 0.5f)
                                                    .interpolatedWith (theme::accent, active.current);
         juce::Graphics::ScopedSaveState save (g);
         g.addTransform (juce::AffineTransform::scale (k * 1.05f, k * 1.05f, r.getCentreX(), r.getCentreY()));
@@ -424,12 +417,12 @@ void HeaderView::paintArt (juce::Graphics& g, Rectangle<float> r, const juce::Im
     }
 
     const float s = r.getWidth() / 136.0f;
-    g.setColour (Colour (0xff262626).withMultipliedAlpha (alpha));
+    g.setColour (Colour (0xff171719).withMultipliedAlpha (alpha));
     g.fillRect (r);
     const auto c = r.getCentre();
-    g.setColour (Colour (0xff1c1c1c).withMultipliedAlpha (alpha));
+    g.setColour (Colour (0xff111113).withMultipliedAlpha (alpha));
     g.fillEllipse (Rectangle<float> (112 * s, 112 * s).withCentre (c));
-    g.setColour (Colour (0xff2f2f2f).withMultipliedAlpha (alpha));
+    g.setColour (Colour (0xff1b1b1e).withMultipliedAlpha (alpha));
     for (float rad : { 48.0f, 41.0f, 34.0f, 27.0f })
         g.drawEllipse (Rectangle<float> (rad * 2 * s, rad * 2 * s).withCentre (c), 1.0f);
 
@@ -442,7 +435,7 @@ void HeaderView::paintArt (juce::Graphics& g, Rectangle<float> r, const juce::Im
 
     g.setColour (theme::accent.withMultipliedAlpha (alpha));
     g.fillEllipse (Rectangle<float> (34 * s, 34 * s).withCentre (c));
-    g.setColour (Colour (0xff1c1c1c).withMultipliedAlpha (alpha));
+    g.setColour (Colour (0xff111113).withMultipliedAlpha (alpha));
     g.fillEllipse (Rectangle<float> (5 * s, 5 * s).withCentre (c));
 }
 
@@ -473,13 +466,13 @@ void HeaderView::paint (juce::Graphics& g)
         g.drawText (t, r.withHeight (titlePx * 1.45f), juce::Justification::topLeft, true);
         if (a.isNotEmpty())
         {
-            g.setColour (Colour (0xffc8c8c8).withAlpha (alpha));
+            g.setColour (Colour (0xffc9c9ce).withAlpha (alpha));
             g.setFont (theme::font (titlePx * 0.78f));
             g.drawText (a, r.withTrimmedTop (titlePx * 1.45f).withHeight (titlePx * 1.2f), juce::Justification::topLeft, true);
         }
 
-        g.setFont (theme::font (11.0f));
-        g.setColour (Colour (0xffb8b8b8).withAlpha (alpha));
+        g.setFont (theme::mono (10.5f, false));
+        g.setColour (Colour (0xffb5b5bc).withAlpha (alpha));
         juce::StringArray all;
         if (roomy)
         {
@@ -557,12 +550,12 @@ void HeaderView::resized()
     repeatButton->setBounds (nextButton->getRight() + gapS, (h - repeatSize) / 2, repeatSize, repeatSize);
     shuffleButton->setBounds (coreX - gapS - repeatSize, (h - repeatSize) / 2, repeatSize, repeatSize);
 
-    // volume: right-aligned before the grid, a full slider when there is room, else just the icon
-    const int volSpace = qx - gapL - (repeatButton->getRight() + gapL);
-    int volW = juce::jlimit (0, 180, volSpace);
-    volume->iconOnly = volW < 100;
+    // volume: centred between the transport and the quick buttons, up to 320 px, else just the icon
+    const int volLeft = repeatButton->getRight() + 2 * gapL, volRight = qx - 2 * gapL;
+    int volW = juce::jlimit (0, 320, volRight - volLeft);
+    volume->iconOnly = volW < 150;
     if (volume->iconOnly) volW = volIcon;
-    volume->setBounds (qx - gapL - volW, h / 2 - 22, volW, 44);
+    volume->setBounds (juce::jmax (repeatButton->getRight() + gapL, volLeft + (volRight - volLeft - volW) / 2), h / 2 - 22, volW, 44);
 
     // text gets everything left of the transport
     textBounds = { textX, kPad + 2, juce::jmax (0, juce::jmin (420, shuffleButton->getX() - gapL - textX)), inner - 4 };

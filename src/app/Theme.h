@@ -20,28 +20,30 @@ inline juce::String utf8 (const char* s) { return juce::String::fromUTF8 (s); }
 
 namespace theme
 {
-// Palette taken from the prototype
-inline const juce::Colour background   { 0xff3e3e3e };
-inline const juce::Colour titleBar     { 0xff3a3a3a };
-inline const juce::Colour titleBlock   { 0xff1b1b1b };
-inline const juce::Colour header       { 0xff383838 };
-inline const juce::Colour waveBg       { 0xff4b4b4b };
-inline const juce::Colour panel        { 0xff565656 };
-inline const juce::Colour panelHover   { 0xff5d5d5d };
-inline const juce::Colour button       { 0xff575757 };
-inline const juce::Colour buttonHover  { 0xff636363 };
-inline const juce::Colour buttonBorder { 0xff626262 };
-inline const juce::Colour icon         { 0xff8c8c8c };
-inline const juce::Colour iconBright   { 0xffd2d2d2 };
+// Studio palette (v0.6): dark graphite surfaces, white type, red-orange accent
+inline const juce::Colour background   { 0xff161618 };
+inline const juce::Colour titleBar     { 0xff1b1b1e };
+inline const juce::Colour titleBlock   { 0xff101012 };
+inline const juce::Colour header       { 0xff1e1e21 };
+inline const juce::Colour waveBg       { 0xff1c1c1f };
+inline const juce::Colour panel        { 0xff222225 };
+inline const juce::Colour panelHover   { 0xff29292d };
+inline const juce::Colour button       { 0xff232326 };
+inline const juce::Colour buttonHover  { 0xff2f2f33 };
+inline const juce::Colour buttonBorder { 0xff2e2e32 };
+inline const juce::Colour icon         { 0xff7a7a82 };
+inline const juce::Colour iconBright   { 0xffd6d6da };
 inline const juce::Colour text         { 0xffffffff };
-inline const juce::Colour textDim      { 0xffababab };
-inline const juce::Colour label        { 0xffd4d4d4 };
-inline const juce::Colour scale        { 0xffbdbdbd };
-inline const juce::Colour waveUnplayed { 0xffb4b4b4 };
-inline const juce::Colour accent       { 0xffe8a33a };
-inline const juce::Colour dialog       { 0xff353535 };
-inline const juce::Colour deep         { 0xff2a2a2a };
-inline const juce::Colour field        { 0xff1f1f1f };
+inline const juce::Colour textDim      { 0xffa4a4ab };
+inline const juce::Colour label        { 0xffd8d8dc };
+inline const juce::Colour scale        { 0xffbbbbc1 };
+inline const juce::Colour waveUnplayed { 0xffb0b0b7 };
+inline const juce::Colour accent       { 0xffff6526 };
+inline const juce::Colour dialog       { 0xff1d1d20 };
+inline const juce::Colour deep         { 0xff19191c };
+inline const juce::Colour field        { 0xff121215 };
+inline const juce::Colour outline      { 0xff28282c };   // 1 px frame around plugin slots
+inline const juce::Colour hairline     { 0xff3d3d42 };   // lines between title bar, header, waveform
 
 inline juce::String sansName()
 {

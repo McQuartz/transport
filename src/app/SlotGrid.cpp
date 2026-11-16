@@ -249,8 +249,11 @@ public:
 
     void paint (juce::Graphics& g) override
     {
+        const auto r = getLocalBounds().toFloat();
         g.setColour (theme::panel.interpolatedWith (theme::panelHover, hover.current * 0.35f));
-        g.fillRoundedRectangle (getLocalBounds().toFloat(), 3.0f);
+        g.fillRoundedRectangle (r, 2.0f);
+        g.setColour (theme::outline);
+        g.drawRoundedRectangle (r.reduced (0.5f), 2.0f, 1.0f);
     }
 
     void paintOverChildren (juce::Graphics& g) override
@@ -283,7 +286,7 @@ public:
             if (c > 0.01f)
             {
                 // solid strip so the plugin's own labels don't show through
-                g.setColour (Colour (0xff2c2c2c).withAlpha (0.96f * c));
+                g.setColour (Colour (0xff1a1a1d).withAlpha (0.96f * c));
                 g.fillRoundedRectangle (getLocalBounds().toFloat().removeFromTop (32.0f), 3.0f);
                 g.setColour (juce::Colours::white.withAlpha (c));
                 g.setFont (theme::font (10.0f, true));
@@ -295,10 +298,10 @@ public:
             {
                 const auto r = buttonRect (i, (int) btns.size());
                 const auto kind = btns[(size_t) i];
-                g.setColour (Colour (0xff2e2e2e).interpolatedWith (kind == Btn::remove ? Colour (0xff6a3a2e) : Colour (0xff4a4a4a), buttonHover[i].current).withAlpha (0.9f * h));
+                g.setColour (Colour (0xff1a1a1d).interpolatedWith (kind == Btn::remove ? Colour (0xff693420) : Colour (0xff1c1c1e), buttonHover[i].current).withAlpha (0.9f * h));
                 g.fillRoundedRectangle (r, 3.0f);
-                auto iconColour = Colour (0xffd6d6d6).interpolatedWith (juce::Colours::white, buttonHover[i].current);
-                if (kind == Btn::power) iconColour = isBypassed() ? Colour (0xff8a8a8a) : theme::accent;
+                auto iconColour = Colour (0xffdadade).interpolatedWith (juce::Colours::white, buttonHover[i].current);
+                if (kind == Btn::power) iconColour = isBypassed() ? Colour (0xff75757c) : theme::accent;
                 g.setColour (iconColour.withAlpha (h));
                 const auto cc = r.getCentre();
                 juce::Path p;

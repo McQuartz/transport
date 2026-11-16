@@ -288,7 +288,7 @@ void WaveformView::paintStyle (juce::Graphics& g, Style s, float alpha, float pl
 
     auto playedColour = [&] (float x, Colour played, Colour unplayed)
     {
-        if (! hasTrack) return Colour (0xff6a6a6a);
+        if (! hasTrack) return Colour (0xff36363b);
         if (x + 2.0f <= playX) return played;
         if (x >= playX)
         {
@@ -307,7 +307,7 @@ void WaveformView::paintStyle (juce::Graphics& g, Style s, float alpha, float pl
         const auto c = Colour::fromFloatRGBA (kLowColour.getFloatRed() * wl + kMidColour.getFloatRed() * wm + kHighColour.getFloatRed() * wh,
                                               kLowColour.getFloatGreen() * wl + kMidColour.getFloatGreen() * wm + kHighColour.getFloatGreen() * wh,
                                               kLowColour.getFloatBlue() * wl + kMidColour.getFloatBlue() * wm + kHighColour.getFloatBlue() * wh, 1.0f);
-        return Colour (0xffd8d8d8).interpolatedWith (c, bandAmount);
+        return Colour (0xffdcdcdf).interpolatedWith (c, bandAmount);
     };
 
     switch (s)
@@ -386,7 +386,7 @@ void WaveformView::paintStyle (juce::Graphics& g, Style s, float alpha, float pl
                 }
             };
             const auto full = getLocalBounds().toFloat();
-            if (! hasTrack) { drawWith (Colour (0xff6a6a6a), full); break; }
+            if (! hasTrack) { drawWith (Colour (0xff36363b), full); break; }
             drawWith (juce::Colours::white, full.withRight (playX));
             drawWith (theme::waveUnplayed, full.withLeft (playX));
             break;

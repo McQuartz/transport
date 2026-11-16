@@ -61,7 +61,7 @@ void TitleBar::paint (juce::Graphics& g)
     const auto menu = menuArea();
     if (! kMacStyle)
     {
-        g.setColour (theme::titleBlock.interpolatedWith (juce::Colour (0xff262626), hover[0].current));
+        g.setColour (theme::titleBlock.interpolatedWith (juce::Colour (0xff171719), hover[0].current));
         g.fillRect (menu);
     }
     else if (hover[0].current > 0.01f)
@@ -79,7 +79,7 @@ void TitleBar::paint (juce::Graphics& g)
                          logo::light.interpolatedWith (juce::Colours::white, hv),
                          logo::grey.interpolatedWith (juce::Colour (0xff6a6a6a), hv));
     }
-    g.setColour (juce::Colour (0xffe6e6e6));
+    g.setColour (juce::Colour (0xffe8e8eb));
     g.setFont (theme::font (11.0f, true));
     g.drawText ("MENU", menu.withTrimmedLeft (36), juce::Justification::centredLeft, false);
 
@@ -137,7 +137,7 @@ void TitleBar::paint (juce::Graphics& g)
             g.setColour (i == 2 ? juce::Colour (0xffc42b1c).withAlpha (hv) : juce::Colours::white.withAlpha (0.08f * hv));
             g.fillRect (r);
         }
-        g.setColour (juce::Colour (0xffd6d6d6).interpolatedWith (juce::Colours::white, hv));
+        g.setColour (juce::Colour (0xffdadade).interpolatedWith (juce::Colours::white, hv));
         const float cx = std::floor (r.getCentreX()) + 0.5f, cyy = std::floor (r.getCentreY()) + 0.5f;
         if (i == 0)
         {
