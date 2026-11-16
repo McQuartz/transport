@@ -92,4 +92,8 @@ file → decoder (read-ahead thread) → audio callback ─┬→ volume → out
 
 ## Licence
 
-Built with [JUCE](https://juce.com), which is available under AGPLv3 or a commercial licence. Distributing a closed-source build requires a JUCE licence.
+Copyright © 2026 the Transport authors (Mo and Ace).
+
+Transport is free software under the [GNU Affero General Public License v3](LICENSE) (AGPLv3): you may use, share and change it, and anyone who passes on a build must also make its source code available under the same licence.
+
+Built with [JUCE](https://juce.com), which is used here under its AGPLv3 option.
